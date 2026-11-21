@@ -39,8 +39,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [totalCount, setTotalCount] = useState(3618);
-  const [syncDate, setSyncDate] = useState('18 Nov 2026');
+  const [totalCount, setTotalCount] = useState<number | null>(null);
+  const [syncDate, setSyncDate] = useState<string>('');
 
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -77,7 +77,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     // 1. Load catalog metadata
     repository.getCatalogMeta().then((meta) => {
       setTotalCount(meta.count);
-      setSyncDate(meta.lastSynced);
+      setSyncDate(meta.lastSyncedShort || meta.lastSynced);
     });
 
     // 2. Load active safety alert
@@ -119,7 +119,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
     if (nextBatch.length > 0) {
       setAllProducts((prev) => [...prev, ...nextBatch]);
-      if (currentOffset + nextBatch.length >= totalCount || nextBatch.length < PAGE_SIZE) {
+      if ((totalCount !== null && currentOffset + nextBatch.length >= totalCount) || nextBatch.length < PAGE_SIZE) {
         setHasMore(false);
       }
     } else {
@@ -216,7 +216,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* Offline Pill Indicator - Shown ONLY when device is offline */}
         {!isOnline && (
           <div className="flex justify-center py-1">
-            <OfflinePill state="offline" productCount={totalCount} />
+            <OfflinePill state="offline" productCount={totalCount ?? undefined} />
           </div>
         )}
 
@@ -282,7 +282,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <div className="flex flex-col gap-2.5 mt-4">
           <div className="flex items-baseline justify-between">
             <h2 className="font-display font-black text-title leading-tight">All products</h2>
-            <span className="text-[13px] font-bold text-ink-muted">{totalCount.toLocaleString()} products</span>
+            <span className="text-[13px] font-bold text-ink-muted">
+              {totalCount !== null ? `${totalCount.toLocaleString()} products` : 'Products'}
+            </span>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -321,9 +323,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {!hasMore && (
             <div className="flex flex-col items-center gap-2 py-8 text-center bg-surface border-thin border-line rounded-lg p-5 mt-2">
               <p className="font-display font-black text-lead leading-tight text-ink">
-                You have seen all {totalCount.toLocaleString()} products
+                {totalCount !== null
+                  ? `You have seen all ${totalCount.toLocaleString()} products`
+                  : 'You have seen all products'}
               </p>
-              <p className="text-[13px] text-ink-muted font-medium">Registry synced {syncDate}</p>
+              {syncDate && <p className="text-[13px] text-ink-muted font-medium">Registry synced {syncDate}</p>}
               <div className="mt-2">
                 <Button
                   tone="secondary"

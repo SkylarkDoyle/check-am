@@ -25,8 +25,8 @@ export const AboutScreen: React.FC<AboutScreenProps> = ({
 }) => {
   const [autoUpdate, setAutoUpdate] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [productCount, setProductCount] = useState(3618);
-  const [lastSynced, setLastSynced] = useState('18 Nov 2026');
+  const [productCount, setProductCount] = useState<number | null>(null);
+  const [lastSynced, setLastSynced] = useState<string>('');
   const [savedCount, setSavedCount] = useState(0);
   const [showIosSheet, setShowIosSheet] = useState(false);
   const { isStandalone, isIos, promptInstall } = usePwaInstall();
@@ -131,8 +131,11 @@ export const AboutScreen: React.FC<AboutScreenProps> = ({
         <div className="flex flex-col gap-2">
           <div className="lbl">OFFLINE CATALOG</div>
           <div className="panel">
-            <KeyValueRow label="On this phone" value={`${productCount.toLocaleString()} products`} />
-            <KeyValueRow label="Last synced" value={lastSynced} />
+            <KeyValueRow
+              label="On this phone"
+              value={productCount !== null ? `${productCount.toLocaleString()} products` : 'Loading catalog…'}
+            />
+            <KeyValueRow label="Last synced" value={lastSynced || 'Pending sync'} />
             <SettingRow
               title="Update automatically"
               detail="Fetch registry changes whenever you have signal."

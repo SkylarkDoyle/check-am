@@ -22,7 +22,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   const [detectedCode, setDetectedCode] = useState<string>('');
   const [isRecognized, setIsRecognized] = useState(false);
   const [isOcrReady, setIsOcrReady] = useState(false);
-  const [totalCount, setTotalCount] = useState(3618);
+  const [totalCount, setTotalCount] = useState<number | undefined>(undefined);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);

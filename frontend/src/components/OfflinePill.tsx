@@ -10,9 +10,9 @@ export interface OfflinePillProps {
 
 export const OfflinePill: React.FC<OfflinePillProps> = ({
   state = 'offline',
-  productCount = 3618,
-  syncDate = '18 Nov 2026',
-  changedCount = 38,
+  productCount,
+  syncDate = '',
+  changedCount,
   className = '',
 }) => {
   return (
@@ -20,17 +20,17 @@ export const OfflinePill: React.FC<OfflinePillProps> = ({
       <i className="ca-off-d" aria-hidden="true"></i>
       {state === 'online' && (
         <span className="ca-off-t" data-for="online">
-          Online. Catalog up to date, {syncDate}
+          Online. Catalog up to date{syncDate ? `, ${syncDate}` : ''}
         </span>
       )}
       {state === 'offline' && (
         <span className="ca-off-t" data-for="offline">
-          Offline. Searching {productCount.toLocaleString()} products saved on this phone
+          Offline. Searching {productCount && productCount > 0 ? `${productCount.toLocaleString()} products` : 'products'} saved on this phone
         </span>
       )}
       {state === 'syncing' && (
         <span className="ca-off-t" data-for="syncing">
-          Syncing updates. {changedCount} changed records
+          Syncing updates{changedCount ? `. ${changedCount} changed records` : '…'}
         </span>
       )}
     </div>

@@ -29,7 +29,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
   const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [checklist, setChecklist] = useState<ChecklistItemModel[]>([]);
-  const [syncDate, setSyncDate] = useState('18 Nov 2026');
+  const [syncDate, setSyncDate] = useState<string>('');
 
   // Always scroll to top on mount or when product changes, before browser paints
   useLayoutEffect(() => {
@@ -179,7 +179,7 @@ Inspect the pack yourself. CheckAm shows what the NAFDAC registry says. It does 
               Found in the registry
             </h1>
             <p className="text-[15px] text-ink font-medium max-w-[240px]">
-              {product.nafdac_reg_num} matches an active NAFDAC record synced {syncDate}.
+              {product.nafdac_reg_num} matches an active NAFDAC record{syncDate ? ` synced ${syncDate}` : ''}.
             </p>
           </div>
         )}
@@ -222,7 +222,7 @@ Inspect the pack yourself. CheckAm shows what the NAFDAC registry says. It does 
               Not found in the registry
             </h1>
             <p className="text-[15px] text-ink font-medium max-w-[240px]">
-              {product.nafdac_reg_num} is lapsed or missing in NAFDAC records synced {syncDate}.
+              {product.nafdac_reg_num} is lapsed or missing in NAFDAC records{syncDate ? ` synced ${syncDate}` : ''}.
             </p>
           </div>
         )}

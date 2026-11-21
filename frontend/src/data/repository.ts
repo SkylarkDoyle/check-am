@@ -284,22 +284,53 @@ export const repository = {
   async getCatalogMeta(): Promise<{
     count: number;
     lastSynced: string;
+    lastSyncedShort: string;
     disclaimer: string;
     coverage: string[];
   }> {
+    // Refresh latest catalog metadata from live API when online
+    try {
+      const meta = await api.getMeta();
+      if (meta) {
+        if (typeof meta.product_count === 'number') {
+          await db.settings.put({ key: 'totalCatalogCount', value: meta.product_count });
+        }
+        if (meta.last_synced_at) {
+          await db.settings.put({ key: 'lastSynced', value: meta.last_synced_at });
+        }
+        if (meta.disclaimer) {
+          await db.settings.put({ key: 'disclaimer', value: meta.disclaimer });
+        }
+        if (meta.coverage) {
+          await db.settings.put({ key: 'coverage', value: meta.coverage });
+        }
+      }
+    } catch {
+      // Offline fallback: use local Dexie settings and cached records
+    }
+
     const countSetting = await db.settings.get('totalCatalogCount');
     const syncedSetting = await db.settings.get('lastSynced');
     const disclaimerSetting = await db.settings.get('disclaimer');
     const coverageSetting = await db.settings.get('coverage');
 
-    const totalCount = countSetting?.value || (await db.products.count()) || 3618;
-    const lastSynced = syncedSetting?.value
-      ? new Date(syncedSetting.value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-      : '18 Nov';
+    const localDbCount = await db.products.count();
+    const totalCount = countSetting?.value ?? localDbCount ?? 0;
+
+    let lastSynced = '';
+    let lastSyncedShort = '';
+    if (syncedSetting?.value) {
+      const dateObj = new Date(syncedSetting.value);
+      if (!isNaN(dateObj.getTime())) {
+        lastSynced = dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        lastSyncedShort = dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      }
+    }
 
     return {
       count: totalCount,
       lastSynced,
+      lastSyncedShort,
       disclaimer:
         disclaimerSetting?.value ||
         'CheckAm reports what the NAFDAC public registry shows. It does not decide whether a product is genuine. Inspect the pack yourself and contact NAFDAC directly for enforcement.',

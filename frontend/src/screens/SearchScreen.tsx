@@ -32,7 +32,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
   const [category, setCategory] = useState<string>('All');
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [, setLoading] = useState(false);
-  const [syncDate, setSyncDate] = useState('18 Nov 2026');
+  const [syncDate, setSyncDate] = useState<string>('');
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -164,7 +164,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
             </h1>
 
             <p className="text-[15px] text-ink-muted max-w-[300px]">
-              {query ? `"${query}"` : 'This item'} is not in the records on this phone, synced {syncDate}.
+              {query ? `"${query}"` : 'This item'} is not in the records on this phone{syncDate ? `, synced ${syncDate}` : ''}.
             </p>
 
             <StatusBadge status="lapsed" size="full" />
