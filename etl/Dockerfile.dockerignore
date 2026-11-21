@@ -1,0 +1,9 @@
+# Applies to the etl/Dockerfile build (context = repo root). Allow-list only what it needs.
+**
+!etl/pyproject.toml
+!etl/src/**
+!etl/config/**
+!db/**
+**/__pycache__
+**/*.py[cod]
+**/*.egg-info
