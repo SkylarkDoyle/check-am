@@ -1,0 +1,14 @@
+# Never upload secrets, local envs or caches to FastAPI Cloud.
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+tests/
+run_server.py
