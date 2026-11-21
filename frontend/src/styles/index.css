@@ -1,0 +1,108 @@
+@import './tokens.css';
+@import './animations.css';
+@import './components.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base Mobile Frame & Responsive Setup */
+html, body {
+  min-height: 100%;
+  background-color: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Hide scrollbars globally across the app while preserving scrolling capability */
+html, body, #root, .app-container, * {
+  scrollbar-width: none !important;  /* Firefox */
+  -ms-overflow-style: none !important;  /* IE and Edge */
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+#root::-webkit-scrollbar,
+.app-container::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+}
+
+.app-container {
+  width: 100%;
+  max-width: 480px;
+  min-height: 100vh;
+  background-color: var(--color-ground);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-shadow: 0 0 24px rgba(0,0,0,0.06);
+}
+
+/* Common Sheet / Modal Overlay */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(29, 42, 26, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  touch-action: none;
+}
+
+.sheet-content {
+  background: var(--color-surface);
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  padding: 12px 20px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+  touch-action: pan-y;
+  will-change: transform;
+}
+
+.grab-handle-container {
+  width: 100%;
+  padding: 6px 0 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: grab;
+  touch-action: none;
+}
+
+.grab-handle-container:active {
+  cursor: grabbing;
+}
+
+.grab-handle {
+  width: 44px;
+  height: 5px;
+  border-radius: 999px;
+  background-color: var(--color-line);
+  flex: none;
+  transition: background-color 0.15s;
+}
+
+.grab-handle-container:hover .grab-handle {
+  background-color: var(--color-ink-muted);
+}

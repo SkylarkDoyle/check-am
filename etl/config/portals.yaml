@@ -1,0 +1,70 @@
+food_db:
+  verified_on: "2026-11-21"
+  url: "https://nafdac.gov.ng/food-products-database/"
+  mode: "xhr"
+  ajax_url: "https://nafdac.gov.ng/wp-admin/admin-ajax.php"
+  table_id: "19494"
+  table_name: "Registered Food Products 2022-2025.csv"
+  selectors:
+    table: "table.ninja_footable"
+    rows: "table.ninja_footable tbody tr"
+    paging: ".footable-paging"
+  columns:
+    product_name: "productname"
+    nafdac_reg_num: "nafdacnumber"
+    category: "category"
+    subcategory: "subcategory"
+    pack_size: "packsize"
+    presentation: "presentation"
+    applicant_name: "applicantname"
+    manufacturer: "manufacturer"
+    issue_date: "issuedate"
+    expiry_date: "expirydate"
+  category_map:
+    Food: "Food"
+    Beverages: "Beverage"
+    Cereals and Cereal Products: "Food"
+    Dairy Products and Analogues: "Food"
+    Farm Produce: "Food"
+    Bakery Wares: "Food"
+    Confectionery: "Food"
+    Fats and oils, and Fat Emulsions: "Food"
+    Ready-to-Eat Savouries: "Food"
+    Salts, Spices, Soups, Sauces, Salads and Seasoning: "Food"
+    Fish and Fish Products: "Food"
+    Meat and Meat Products: "Food"
+
+napams:
+  verified_on: "2026-11-21"
+  url: "https://registration.nafdac.gov.ng/"
+  mode: "login_required"
+  login_required: true
+  reason: "Requires captchaToken, CertificateNumber, and __RequestVerificationToken. Automated access skipped per polite scraper rule 3."
+
+greenbook:
+  verified_on: "2026-11-21"
+  url: "https://greenbook.nafdac.gov.ng"
+  endpoint: "https://greenbook.nafdac.gov.ng"
+  mode: "xhr"
+  total_records: 9048
+  columns:
+    product_name: "product_name"
+    nafdac_reg_num: "NAFDAC"
+    ingredient: "ingredient.ingredient_name"
+    applicant: "applicant.name"
+    category: "product_category.name"
+    approval_date: "approval_date"
+    expiry_date: "expiry_date"
+    status: "status"
+  # Greenbook exposes no OTC flag by name, but marketing_category_id separates the classes:
+  # 2 = non-prescription (paracetamol, ibuprofen, antacids, loperamide, vitamins, ...),
+  # 1 = prescription-only (amoxicillin, tramadol, statins, ARVs ...), 5 = medical devices.
+  # Verified empirically on all 9,048 records on 2026-11-21 (id->label mapping is inferred).
+  otc_marketing_category_ids: [2]
+  otc_category_names: ["Drugs", "Herbals and Nutraceuticals"]
+  excluded_routes: ["intravenous", "intramuscular", "subcutaneous", "parenteral", "intrathecal"]
+
+alerts:
+  # Restored after an accidental truncation of this file; index_url taken from scripts/inspect_alerts.py
+  # (the only key alerts_pdf.py reads). Re-verify it against the live site.
+  index_url: "https://nafdac.gov.ng/category/recalls-and-alerts/"
