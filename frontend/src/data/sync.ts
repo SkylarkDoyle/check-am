@@ -1,6 +1,7 @@
 import { api, CheckAmApiError } from '../api/client';
 import { db } from '../db';
 import { mapApiAlertToModel, mapApiProductToModel } from './mappers';
+import { rebuildSearchIndex } from './searchIndex';
 
 export interface SyncStatus {
   state: 'idle' | 'checking' | 'downloading' | 'applying' | 'done' | 'error';
@@ -96,6 +97,9 @@ export async function runSync(force = false): Promise<boolean> {
         await db.settings.put({ key: 'coverage', value: bundle.meta.coverage });
       }
     });
+
+    // Rebuild in-memory search index with the newly synced products
+    rebuildSearchIndex().catch((err) => console.warn('Failed to rebuild search index after sync', err));
 
     notify({
       state: 'done',

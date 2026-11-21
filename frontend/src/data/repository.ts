@@ -8,12 +8,11 @@ import {
   mapApiProductDetailToModel,
   mapApiProductToModel,
 } from './mappers';
+import { ensureSearchIndex, localSearchProducts, SearchResultItem } from './searchIndex';
 import { runSync } from './sync';
 import { ChecklistItemModel, Product, ProductCategory, SafetyAlert, SavedCheck } from '../types';
 
-export interface SearchResultItem extends Product {
-  match_type?: 'reg_exact' | 'reg_prefix' | 'name' | 'maker';
-}
+export type { SearchResultItem };
 
 export const repository = {
   async ensureInitialized(): Promise<void> {
@@ -21,6 +20,9 @@ export const repository = {
     if (count === 0) {
       // Trigger background sync
       runSync().catch((err) => console.warn('Initial sync failed', err));
+    } else {
+      // Warm up in-memory search index in background
+      ensureSearchIndex().catch((err) => console.warn('Search index warmup failed', err));
     }
   },
 
@@ -54,7 +56,15 @@ export const repository = {
     const q = query.trim();
     if (!q) return [];
 
-    // 1. Try online search for ranking and match_type
+    await this.ensureInitialized();
+
+    const localCount = await db.products.count();
+    if (localCount > 0) {
+      // 1. Local-first search: instant response (<5ms), fuzzy matching & ranking via MiniSearch
+      return localSearchProducts(q, category, limit);
+    }
+
+    // 2. Fallback to API ONLY when local copy is empty (first run / sync pending)
     try {
       const apiRes = await api.search(q, category as ApiUiCategory, limit);
       if (apiRes && apiRes.items) {
@@ -64,44 +74,10 @@ export const repository = {
         }));
       }
     } catch {
-      // Fallback to local Dexie search when offline
+      // Network failed while local catalog is empty
     }
 
-    // 2. Offline fallback search in Dexie
-    const norm = q.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-    const isNum = /\d/.test(norm);
-    const qLower = q.toLowerCase();
-
-    let matches: Product[] = [];
-    if (isNum && norm.length >= 2) {
-      matches = await db.products
-        .filter((p) => p.normalized_reg_num.includes(norm))
-        .limit(limit)
-        .toArray();
-      if (matches.length > 0) {
-        return matches.map((m) => ({
-          ...m,
-          match_type: m.normalized_reg_num === norm ? 'reg_exact' : 'reg_prefix',
-        }));
-      }
-    }
-
-    // Name or manufacturer match
-    matches = await db.products
-      .filter((p) => {
-        if (category && p.category !== category) return false;
-        return (
-          p.product_name.toLowerCase().includes(qLower) ||
-          p.manufacturer.toLowerCase().includes(qLower)
-        );
-      })
-      .limit(limit)
-      .toArray();
-
-    return matches.map((m) => ({
-      ...m,
-      match_type: m.product_name.toLowerCase().includes(qLower) ? 'name' : 'maker',
-    }));
+    return [];
   },
 
   async lookupReg(rawReg: string): Promise<{ result: 'match' | 'multiple' | 'not_found'; products: Product[] }> {
@@ -131,29 +107,52 @@ export const repository = {
   },
 
   async getProduct(id: string): Promise<Product | null> {
-    // 1. Try API first for freshest alert joins and checklists
+    // 1. Local-first: instant resolution from IndexedDB (<2ms)
+    const local = await db.products.get(id);
+    if (local) {
+      // Attach local alerts and checklist from IndexedDB
+      const alerts = await db.alerts.where('nafdac_reg_num').equals(local.nafdac_reg_num).toArray();
+      const checklist = await this.resolveChecklist(
+        local.category,
+        local.pack_type,
+        local.nafdac_reg_num,
+        local.product_name
+      );
+
+      const productModel: Product = {
+        ...local,
+        alerts,
+        checklist,
+      };
+
+      // 2. Non-blocking background refresh if online (updates local cache silently)
+      if (typeof navigator !== 'undefined' && navigator.onLine) {
+        api.getProduct(id)
+          .then(async (freshDetail) => {
+            if (freshDetail) {
+              const freshModel = mapApiProductDetailToModel(freshDetail);
+              await db.products.put(freshModel);
+            }
+          })
+          .catch(() => {});
+      }
+
+      return productModel;
+    }
+
+    // 3. Fallback to API only if not found locally (first run before sync or direct deep link)
     try {
       const detail = await api.getProduct(id);
       if (detail) {
-        return mapApiProductDetailToModel(detail);
+        const mapped = mapApiProductDetailToModel(detail);
+        await db.products.put(mapped);
+        return mapped;
       }
     } catch {
-      // Fall through to offline cache
+      // Network failed or offline
     }
 
-    // 2. Load from Dexie
-    const local = await db.products.get(id);
-    if (!local) return null;
-
-    // Attach local alerts and checklist
-    const alerts = await db.alerts.where('nafdac_reg_num').equals(local.nafdac_reg_num).toArray();
-    const checklist = await this.resolveChecklist(local.category, local.pack_type, local.nafdac_reg_num, local.product_name);
-
-    return {
-      ...local,
-      alerts,
-      checklist,
-    };
+    return null;
   },
 
   async listAlerts(limit = 20): Promise<SafetyAlert[]> {
