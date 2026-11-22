@@ -1,0 +1,50 @@
+# Deploys the FastAPI backend to FastAPI Cloud whenever backend code changes on main.
+#
+# One-time setup (in GitHub: Settings > Secrets and variables > Actions > New repository secret):
+#   FASTAPI_CLOUD_TOKEN   a deploy token for the app. Create it with:
+#                         fastapi cloud tokens create        (run in the backend folder, logged in)
+#                         or in the FastAPI Cloud dashboard under the app's Tokens.
+#   FASTAPI_CLOUD_APP_ID  the app id, the "app_id" value in backend/.fastapicloud/cloud.json
+#
+# The app's own settings (DATABASE_URL, SERPAPI_API_KEY, ...) live in FastAPI Cloud as environment
+# variables and secrets, never in this repository. This job only uploads the code.
+# The Cloudflare Pages frontend deploys separately, from its own Git connection.
+name: Deploy API to FastAPI Cloud
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-api.yml"
+  workflow_dispatch: # lets you run it by hand from the Actions tab
+
+# Never run two deploys at once; a newer push replaces a queued one.
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --no-dev
+
+      - name: Deploy
+        run: uv run fastapi deploy
+        env:
+          FASTAPI_CLOUD_TOKEN: ${{ secrets.FASTAPI_CLOUD_TOKEN }}
+          FASTAPI_CLOUD_APP_ID: ${{ secrets.FASTAPI_CLOUD_APP_ID }}
