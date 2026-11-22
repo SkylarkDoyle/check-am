@@ -10,9 +10,23 @@ import {
 } from './mappers';
 import { ensureSearchIndex, localSearchProducts, SearchResultItem } from './searchIndex';
 import { runSync } from './sync';
-import { ChecklistItemModel, Product, ProductCategory, SafetyAlert, SavedCheck } from '../types';
+import {
+  ChecklistItemModel,
+  ChecklistState,
+  Product,
+  ProductCategory,
+  SafetyAlert,
+  SavedCheck,
+} from '../types';
 
 export type { SearchResultItem };
+
+/** Older installs stored 'done' and 'flag'; map them onto the tick/cross model. */
+export function normalizeChecklistState(raw: string): ChecklistState {
+  if (raw === 'match' || raw === 'done') return 'match';
+  if (raw === 'nomatch' || raw === 'flag') return 'nomatch';
+  return 'todo';
+}
 
 export const repository = {
   async ensureInitialized(): Promise<void> {
@@ -236,11 +250,11 @@ export const repository = {
     }));
   },
 
-  async getChecklistProgress(productId: string): Promise<Record<string, 'todo' | 'done' | 'flag'>> {
+  async getChecklistProgress(productId: string): Promise<Record<string, ChecklistState>> {
     const records = await db.checklist_progress.where('productId').equals(productId).toArray();
-    const result: Record<string, 'todo' | 'done' | 'flag'> = {};
+    const result: Record<string, ChecklistState> = {};
     for (const r of records) {
-      result[r.pointKey] = r.state;
+      result[r.pointKey] = normalizeChecklistState(r.state);
     }
     return result;
   },
@@ -248,7 +262,7 @@ export const repository = {
   async setChecklistProgress(
     productId: string,
     pointKey: string,
-    state: 'todo' | 'done' | 'flag'
+    state: ChecklistState
   ): Promise<void> {
     await db.checklist_progress.put({
       productId,

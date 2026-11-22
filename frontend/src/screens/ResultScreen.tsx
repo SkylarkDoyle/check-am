@@ -3,15 +3,17 @@ import {
   StatusBadge,
   Thumb,
   KeyValueRow,
-  ChecklistItem,
+  ChecklistRow,
+  CheckBar,
   Button,
   Disclaimer,
   RegNumber,
   BottomSheet
 } from '../components';
-import { Product, ChecklistItemModel } from '../types';
+import { Product, ChecklistItemModel, ChecklistState } from '../types';
 import { formatDisplayDate } from '../data/mappers';
 import { repository } from '../data/repository';
+import { haptic } from '../lib/haptics';
 
 interface ResultScreenProps {
   product: Product;
@@ -71,12 +73,18 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
     loadChecklist();
   }, [initialProduct.id, initialProduct.category, initialProduct.pack_type, initialProduct.nafdac_reg_num, initialProduct.product_name]);
 
-  const handleToggleChecklist = async (key: string) => {
+  // One short cue when a result opens: the pattern tells match, lapsed and alert apart by feel.
+  useEffect(() => {
+    haptic(product.status === 'match' ? 'match' : product.status === 'alert' ? 'alert' : 'lapsed');
+  }, [product.id, product.status]);
+
+  const handleChooseChecklist = async (key: string, choice: 'match' | 'nomatch') => {
     const item = checklist.find((c) => c.key === key);
     if (!item) return;
 
-    const nextState: 'todo' | 'done' | 'flag' =
-      item.state === 'todo' ? 'done' : item.state === 'done' ? 'flag' : 'todo';
+    // Tapping the active tick or cross again clears the answer.
+    const nextState: ChecklistState = item.state === choice ? 'todo' : choice;
+    if (nextState !== 'todo') haptic(nextState === 'match' ? 'tick' : 'cross');
 
     setChecklist((prev) =>
       prev.map((c) => (c.key === key ? { ...c, state: nextState } : c))
@@ -91,6 +99,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
       return;
     }
     await repository.saveCheck(product);
+    haptic('save');
     setIsSaved(true);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('app:saved-checks-updated'));
@@ -155,7 +164,7 @@ Inspect the pack yourself. CheckAm shows what the NAFDAC registry says. It does 
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-ground pb-8 pt-2">
+    <div className="flex flex-col min-h-screen bg-ground pt-2">
       {/* Top Header Bar */}
       <div className="bar flex items-center justify-between px-4 py-2">
         <button
@@ -197,7 +206,7 @@ Inspect the pack yourself. CheckAm shows what the NAFDAC registry says. It does 
                 <path d="M5.5 12.5l4.5 4.5 8.5-10" />
               </svg>
             </span>
-            <StatusBadge status="match" size="full" />
+            <StatusBadge status="match" size="full" tappable />
             <h1 className="font-display font-black text-hero leading-tight text-ink max-w-[290px]">
               Found in the registry
             </h1>
@@ -219,7 +228,7 @@ Inspect the pack yourself. CheckAm shows what the NAFDAC registry says. It does 
                 <path d="M12 10v4.5M12 17.2v.1" />
               </svg>
             </span>
-            <StatusBadge status="alert" size="full" />
+            <StatusBadge status="alert" size="full" tappable />
             <h1 className="font-display font-black text-hero leading-tight text-ink max-w-[290px]">
               Named in a public alert
             </h1>
@@ -240,7 +249,7 @@ Inspect the pack yourself. CheckAm shows what the NAFDAC registry says. It does 
                 <path d="M6 12h12" />
               </svg>
             </span>
-            <StatusBadge status="lapsed" size="full" />
+            <StatusBadge status="lapsed" size="full" tappable />
             <h1 className="font-display font-black text-hero leading-tight text-ink max-w-[250px]">
               Not found in the registry
             </h1>
@@ -313,38 +322,37 @@ Inspect the pack yourself. CheckAm shows what the NAFDAC registry says. It does 
           </div>
         )}
 
-        {/* Interactive Packaging Authenticity Checklist Panel */}
+        {/* Interactive pack checklist: tick or cross per item (Doop component ChecklistRow) */}
         <div className="bg-surface rounded-lg border-w border-line px-5 py-3">
           <h3 className="font-display font-black text-[17px] pt-1 pb-1">Check the pack yourself</h3>
           {checklist.map((item) => (
-            <ChecklistItem
+            <ChecklistRow
               key={item.key}
               title={item.label}
               detail={item.detail}
               state={item.state}
-              flagHint="Take a photo. If this looks altered or unexpected, do not consume and report to NAFDAC."
-              onToggle={() => handleToggleChecklist(item.key)}
+              onChoose={(choice) => handleChooseChecklist(item.key, choice)}
             />
           ))}
         </div>
 
-        {/* Actions & Legal Disclaimer */}
-        <div className="flex flex-col gap-2 pt-2">
-          <Button
-            tone="primary"
-            width="full"
-            label="Share on WhatsApp"
-            onClick={() => setShareSheetOpen(true)}
-          />
-          <Button
-            tone="ghost"
-            width="auto"
-            label={isSaved ? '✓ Saved to this phone' : 'Save this check'}
-            onClick={handleSaveCheck}
-          />
+        {/* Legal disclaimer */}
+        <div className="pt-1 pb-4">
           <Disclaimer />
         </div>
       </main>
+
+      {/* Sticky action bar: progress, then Save and Share (Doop component CheckBar) */}
+      {checklist.length > 0 && (
+        <CheckBar
+          total={checklist.length}
+          matched={checklist.filter((c) => c.state === 'match').length}
+          mismatched={checklist.filter((c) => c.state === 'nomatch').length}
+          isSaved={isSaved}
+          onSave={handleSaveCheck}
+          onShare={() => setShareSheetOpen(true)}
+        />
+      )}
 
       {/* Image Sheet Viewer */}
       <BottomSheet isOpen={imagePreviewOpen} onClose={() => setImagePreviewOpen(false)} title="Image preview">

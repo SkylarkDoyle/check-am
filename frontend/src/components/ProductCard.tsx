@@ -63,7 +63,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <p className="ca-card-m">{maker}</p>
         <div className="ca-card-r">
           {regSlot || (regNumber && <RegNumber value={regNumber} />)}
-          {badgeSlot || <StatusBadge status={status} size="short" />}
+          {badgeSlot || <StatusBadge status={status} size="short" tappable />}
         </div>
       </div>
     </div>

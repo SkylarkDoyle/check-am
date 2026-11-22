@@ -46,12 +46,15 @@ export interface SafetyAlert {
   is_active?: boolean;
 }
 
+/** Person's answer for one pack check: tick = matches the registry record, cross = does not match. */
+export type ChecklistState = 'todo' | 'match' | 'nomatch';
+
 export interface ChecklistItemModel {
   key: string;
   label: string;
   detail: string;
   kind: 'common' | 'variant';
-  state?: 'todo' | 'done' | 'flag';
+  state?: ChecklistState;
 }
 
 export interface SavedCheck {
@@ -68,6 +71,7 @@ export interface SavedCheck {
 export interface ChecklistProgressRecord {
   productId: string;
   pointKey: string;
-  state: 'todo' | 'done' | 'flag';
+  /** 'done' and 'flag' are legacy values written before the tick/cross design. */
+  state: ChecklistState | 'done' | 'flag';
   updatedAt: string;
 }

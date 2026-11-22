@@ -13,6 +13,9 @@ import { db } from '../db';
 import { repository } from '../data/repository';
 import { runSync, subscribeSyncStatus, SyncStatus } from '../data/sync';
 import { usePwaInstall } from '../hooks/usePwaInstall';
+import { canVibrate, isHapticsEnabled, saveHapticsEnabled, haptic } from '../lib/haptics';
+import { AI_FIXTURES } from '../hooks/useAiLookup';
+import { api } from '../api/client';
 
 interface AboutScreenProps {
   onNavigateTab: (tab: 'home' | 'scan' | 'saved' | 'about') => void;
@@ -29,12 +32,18 @@ export const AboutScreen: React.FC<AboutScreenProps> = ({
   const [lastSynced, setLastSynced] = useState<string>('');
   const [savedCount, setSavedCount] = useState(0);
   const [showIosSheet, setShowIosSheet] = useState(false);
+  const [vibration, setVibration] = useState(isHapticsEnabled());
+  const [aiOn, setAiOn] = useState(AI_FIXTURES);
   const { isStandalone, isIos, promptInstall } = usePwaInstall();
 
   useEffect(() => {
     db.settings.get('autoUpdate').then((res) => {
       if (res !== undefined) setAutoUpdate(res.value);
     });
+
+    if (!AI_FIXTURES) {
+      api.getMeta().then((m) => setAiOn(Boolean(m.ai_lookup_enabled))).catch(() => setAiOn(false));
+    }
 
     repository.getCatalogMeta().then((meta) => {
       setProductCount(meta.count);
@@ -151,6 +160,38 @@ export const AboutScreen: React.FC<AboutScreenProps> = ({
                 disabled={isUpdating}
               />
             </div>
+          </div>
+        </div>
+
+        {/* Section: THIS PHONE */}
+        <div className="flex flex-col gap-2">
+          <div className="lbl">THIS PHONE</div>
+          <div className="panel">
+            <SettingRow
+              title="Vibration"
+              detail={
+                canVibrate()
+                  ? 'A short buzz when a scan succeeds, a result opens, or you answer a check.'
+                  : 'Not available on this phone or browser (iPhone does not allow it).'
+              }
+            >
+              <Toggle
+                checked={vibration && canVibrate()}
+                disabled={!canVibrate()}
+                ariaLabel="Vibration"
+                onChange={async (checked) => {
+                  setVibration(checked);
+                  await saveHapticsEnabled(checked);
+                  if (checked) haptic('tick');
+                }}
+              />
+            </SettingRow>
+            {aiOn && (
+              <p className="text-xs text-ink-muted leading-relaxed pb-3">
+                The optional AI lookup sends the text you searched to a third-party AI service. Nothing
+                else leaves your phone.
+              </p>
+            )}
           </div>
         </div>
 

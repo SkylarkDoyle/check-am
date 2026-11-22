@@ -30,7 +30,7 @@ CheckAm is an offline-first Progressive Web App for Nigerian shoppers. It looks 
 Base URL: `https://checkam-api.fastapicloud.dev/api/v1`
 
 - Read-only JSON over HTTPS. **No API key, no accounts.** CORS is restricted to the CheckAm web app, so browser apps on other origins cannot call it directly. Server-side and command-line use works.
-- Be kind: cache responses and do not hammer it. `/search` is rate-limited to 60 requests per minute per IP, and heavier use may be limited further.
+- Be kind: cache responses and do not hammer it. `/search` is rate-limited to 60 requests per minute per IP, and heavier use may be limited further. The AI lookup has its own daily limits (below).
 - The service runs on a free tier that **scales to zero**. The first request after a quiet period can take a few seconds. There is no uptime guarantee.
 - Unprefixed aliases exist (for example `/search`), but `/api/v1/...` is the stable path.
 
@@ -49,7 +49,18 @@ Base URL: `https://checkam-api.fastapicloud.dev/api/v1`
 | `GET /meta` | Disclaimer, coverage, counts and the last sync time. |
 | `GET /sync/manifest` | Version, counts, size and SHA-256 of the offline bundle. |
 | `GET /sync-bundle` | The full dataset as one gzipped JSON file, with ETag support (`If-None-Match`). The PWA uses this for offline search. |
+| `GET /ai-lookup/usage` | Whether the optional AI lookup is on and how many lookups this device has left today. Needs an `X-Device-Id` header (any random UUID). |
+| `POST /ai-lookup` body `{"q": "..."}` | Optional AI summary of what a product's genuine pack looks like and common signs of counterfeits, for something not in the registry. Needs `X-Device-Id`. |
 | `GET /health`, `GET /ready` | Liveness, and readiness including the database. |
+
+### AI lookup
+
+An optional extra for products that are not in the registry. The backend asks Google AI Mode through SerpApi (the key stays on the server), cleans the answer (plain text only, no phone numbers, no social-media sources) and caches it, so the same question is answered once.
+
+- **Limits:** 5 lookups per device per day (counted by the random `X-Device-Id`, so it is a fair-use limit, not a hard one), plus a per-IP and an app-wide daily cap. A cached answer, a failed call and a "nothing reliable found" result are free.
+- **Errors:** `429 AI_LIMIT_REACHED`, `503 AI_UNAVAILABLE` or `AI_BUSY`, `422 INVALID_QUERY` or `AI_DEVICE_REQUIRED`, all as `{"error": {"code", "message"}}`.
+- **Treat it as a hint, not a verdict.** AI responses may include mistakes, and packaging differs by country. Every answer carries that disclaimer.
+- **Off by default:** it is on only when the server has a `SERPAPI_API_KEY`. `GET /meta` reports `ai_lookup_enabled`.
 
 ### Status values
 
@@ -131,8 +142,8 @@ NAFDAC public portals ──► ETL (Python) ──► PostgreSQL (Neon) ──�
 How it behaves:
 
 - **Offline first.** The PWA downloads one gzipped bundle (about 260 KB) and answers searches on the phone. The API is only needed to sync and for fallback search.
-- **Hands-free scan.** The camera reads the NAFDAC number on the pack on the device. No photo is uploaded.
-- **Private by design.** No accounts, no location, no analytics identifiers.
+- **Hands-free scan.** The camera reads the NAFDAC number on the pack on the device, with no button to press. A number is accepted only after the same reading repeats, and a misread is only corrected through look-alike characters (O and 0, B and 8), never by guessing a neighbouring product. No photo is uploaded.
+- **Private by design.** No accounts and no location. The web app uses Cloudflare Web Analytics for anonymous, cookieless page counts.
 
 ---
 
@@ -220,7 +231,10 @@ The dev server runs on `http://localhost:5173` and proxies `/api` to the API on 
 ```bash
 cd backend && uv run pytest        # needs DATABASE_URL pointing at a loaded database
 pytest                              # ETL tests, run from the repository root
+cd frontend && pnpm test            # label reader, checklist, device id, haptics
 ```
+
+To measure the label reader on real packs, put photos in `frontend/test-fixtures/packs/`, add each photo's expected number and aiming box to `frontend/scripts/ocr-fixtures.py` and `frontend/src/lib/ocr/bench.test.ts`, then run `python scripts/ocr-fixtures.py` followed by `OCR_BENCH=1 pnpm test`.
 
 ---
 

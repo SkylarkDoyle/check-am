@@ -1,7 +1,19 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import type { Worker } from 'tesseract.js';
 import { Button, OfflinePill } from '../components';
 import { repository } from '../data/repository';
+import { db } from '../db';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { haptic } from '../lib/haptics';
+import {
+  Pixels,
+  ReadMode,
+  RegistryIndex,
+  ScanSession,
+  computeCropRect,
+  readCrop,
+  readPhoto,
+} from '../lib/ocr';
 
 interface ScanScreenProps {
   onScanResult: (detectedCode: string) => void;
@@ -9,128 +21,113 @@ interface ScanScreenProps {
   onTypeInstead?: () => void;
 }
 
-/**
- * Extracts potential NAFDAC registration numbers from OCR text.
- * Covers all valid Nigerian registry formats without artificial prefix restrictions:
- * - Hyphenated e.g. 04-0023, A8-101168L, B1-3599, A4-1070, A11-1222, 01-0022
- * - Slashes e.g. 04/0023, A8/101168L
- * - Spaced e.g. A8 101168L, 04 0023
- * - Continuous alphanumeric e.g. A8101168L, 040023
- * - Following labels: NAFDAC NO, NRN, REG NO
- */
-export function extractNafdacCandidates(text: string): string[] {
-  if (!text) return [];
-  const candidates: string[] = [];
+/** One read about every 0.7 s while the screen is open. No button, no photo to take. */
+const TICK_MS = 700;
+const HINT_CLOSER_MS = 8000;
+const HINT_GIVE_UP_MS = 20000;
+const MAX_CROP_WIDTH = 1600;
+const WHITELIST = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-/. ';
 
-  // Pattern 1: Explicit NAFDAC / REG prefix context
-  const labeledMatches = text.matchAll(/(?:NAFDAC|REG|NRN)[^A-Za-z0-9]*([A-Za-z0-9]{1,4}[-/ ]?[0-9]{3,8}[A-Za-z]?)/gi);
-  for (const m of labeledMatches) {
-    const raw = m[1].replace(/[\s/]/g, '-').toUpperCase();
-    if (/\d/.test(raw) && raw.length >= 4) {
-      candidates.push(raw);
-    }
+/** Registered numbers on this phone, so a misread character can be repaired against them. */
+async function loadRegistryIndex(): Promise<RegistryIndex | null> {
+  try {
+    const regs = (await db.products.orderBy('nafdac_reg_num').uniqueKeys()).map(String);
+    return regs.length > 0 ? new RegistryIndex(regs) : null;
+  } catch {
+    return null;
   }
-
-  // Pattern 2: Standard alphanumeric code with hyphen or slash (e.g. 04-0023, A8-101902L, A11-1222)
-  const standardMatches = text.matchAll(/\b([A-Za-z0-9]{1,4})[-/ ]([0-9]{3,8}[A-Za-z]?)\b/gi);
-  for (const m of standardMatches) {
-    const code = `${m[1].toUpperCase()}-${m[2].toUpperCase()}`;
-    if (/\d/.test(code)) {
-      candidates.push(code);
-    }
-  }
-
-  // Pattern 3: Standalone alphanumeric tokens with 5 to 14 characters containing digits
-  const tokens = text.split(/[\s,;:|()\[\]]+/);
-  for (const token of tokens) {
-    const clean = token.replace(/[^A-Za-z0-9-]/g, '').toUpperCase();
-    // Must contain at least 3 digits and be 5-14 chars
-    const digitCount = (clean.match(/\d/g) || []).length;
-    if (clean.length >= 5 && clean.length <= 14 && digitCount >= 3) {
-      candidates.push(clean);
-    }
-  }
-
-  return Array.from(new Set(candidates));
 }
 
-export const ScanScreen: React.FC<ScanScreenProps> = ({
-  onScanResult,
-  onClose,
-  onTypeInstead,
-}) => {
+function pixelsToCanvas(p: Pixels): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = p.width;
+  canvas.height = p.height;
+  canvas.getContext('2d')?.putImageData(new ImageData(new Uint8ClampedArray(p.data), p.width, p.height), 0, 0);
+  return canvas;
+}
+
+export const ScanScreen: React.FC<ScanScreenProps> = ({ onScanResult, onClose, onTypeInstead }) => {
   const isOnline = useOnlineStatus();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [detectedCode, setDetectedCode] = useState<string>('');
-  const [isScanning, setIsScanning] = useState(false);
-  const [isOcrReady, setIsOcrReady] = useState(false);
+  const [engineReady, setEngineReady] = useState(false);
+  const [isReadingPhoto, setIsReadingPhoto] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [totalCount, setTotalCount] = useState<number | undefined>(undefined);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [torch, setTorch] = useState({ supported: false, on: false });
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const guideRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const workerRef = useRef<any>(null);
+  const workerRef = useRef<Worker | null>(null);
+  const indexRef = useRef<RegistryIndex | null>(null);
+  const sessionRef = useRef<ScanSession>(new ScanSession(null));
+  const frameCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const doneRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ---- setup and teardown -------------------------------------------------------------------
   useEffect(() => {
-    repository.getCatalogMeta().then((meta) => {
-      setTotalCount(meta.count);
+    // React dev mode mounts twice; the flag must start false on every mount.
+    doneRef.current = false;
+    repository.getCatalogMeta().then((meta) => setTotalCount(meta.count));
+    loadRegistryIndex().then((index) => {
+      indexRef.current = index;
+      sessionRef.current = new ScanSession(index);
     });
-
     startCamera();
-    initTesseract();
+    initEngine();
 
     return () => {
+      doneRef.current = true;
       stopCamera();
-      if (workerRef.current) {
-        workerRef.current.terminate().catch(() => {});
-        workerRef.current = null;
-      }
+      workerRef.current?.terminate().catch(() => {});
+      workerRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const initTesseract = async () => {
+  const initEngine = async () => {
     try {
       const { createWorker } = await import('tesseract.js');
       const worker = await createWorker('eng');
-      // Full character set without restrictive whitelisting so dashes and labels are preserved
-      await worker.setParameters({
-        tessedit_pageseg_mode: '6' as any, // Assume a single uniform block of text
-      });
+      if (doneRef.current) {
+        worker.terminate().catch(() => {});
+        return;
+      }
       workerRef.current = worker;
-      setIsOcrReady(true);
+      setEngineReady(true);
     } catch (err) {
-      console.warn('Tesseract OCR worker initialization error:', err);
+      console.warn('Text reader failed to start', err);
+      setStatusMessage('The reader could not start. Upload a photo or type the number instead.');
     }
   };
 
   const startCamera = async () => {
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      if (!navigator.mediaDevices?.getUserMedia) {
         setHasPermission(false);
         return;
       }
-
       let stream: MediaStream;
       try {
-        // Try high-resolution back camera first
         stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-          },
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
         });
       } catch {
-        // Fallback to any default camera available
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-        });
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
       }
-
       streamRef.current = stream;
+
+      // Keep the picture sharp while the phone moves, and offer the torch where the phone has one.
+      const track = stream.getVideoTracks()[0];
+      const caps = (track?.getCapabilities?.() ?? {}) as Record<string, unknown>;
+      if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
+        track.applyConstraints({ advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet] }).catch(() => {});
+      }
+      setTorch({ supported: Boolean(caps.torch), on: false });
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play().catch(() => {});
@@ -142,133 +139,166 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   };
 
   const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
   };
 
-  // Perform OCR on an image source (from video capture or uploaded file)
-  const performOcr = async (sourceCanvas: HTMLCanvasElement) => {
-    setIsScanning(true);
-    setStatusMessage('Reading pack label…');
-
+  const toggleTorch = async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const next = !torch.on;
     try {
-      if (!workerRef.current) {
-        // Fallback init worker if not ready yet
-        const { createWorker } = await import('tesseract.js');
-        const worker = await createWorker('eng');
-        await worker.setParameters({
-          tessedit_pageseg_mode: '6' as any,
-        });
-        workerRef.current = worker;
-        setIsOcrReady(true);
-      }
-
-      const ret = await workerRef.current.recognize(sourceCanvas);
-      const rawText = ret?.data?.text?.trim() || '';
-      console.info('OCR text detected:', rawText);
-
-      const candidates = extractNafdacCandidates(rawText);
-
-      if (candidates.length > 0) {
-        // Try finding a direct registry match among candidates
-        let matchedCode: string | null = null;
-        for (const candidate of candidates) {
-          const lookup = await repository.lookupReg(candidate);
-          if (lookup.result === 'match' && lookup.products.length > 0) {
-            matchedCode = lookup.products[0].nafdac_reg_num;
-            break;
-          }
-        }
-
-        const finalCode = matchedCode || candidates[0];
-        setDetectedCode(finalCode);
-        setStatusMessage(`Detected ${finalCode}`);
-
-        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-          try {
-            navigator.vibrate(50);
-          } catch {
-            // ignore
-          }
-        }
-
-        // Trigger result navigation immediately
-        onScanResult(finalCode);
-        return;
-      }
-
-      setStatusMessage('Could not read number clearly. Hold closer or type it below.');
-    } catch (err) {
-      console.warn('OCR scan error:', err);
-      setStatusMessage('Scan failed. Please type the number or try another photo.');
-    } finally {
-      setIsScanning(false);
+      await track.applyConstraints({ advanced: [{ torch: next } as MediaTrackConstraintSet] });
+      setTorch({ supported: true, on: next });
+    } catch {
+      setTorch({ supported: false, on: false });
     }
   };
 
-  // User explicitly clicks "Scan Label" to capture the live frame and OCR it
-  const handleCaptureAndScan = () => {
-    if (isScanning) return;
+  // ---- reading ------------------------------------------------------------------------------
+  const recognize = useCallback(async (image: Pixels, mode: ReadMode): Promise<string> => {
+    const worker = workerRef.current;
+    if (!worker) return '';
+    await worker.setParameters({
+      tessedit_pageseg_mode: (mode === 'sparse' ? '11' : '6') as never,
+      // 'free' (whole photos) reads without restricting the characters.
+      tessedit_char_whitelist: mode === 'free' ? '' : WHITELIST,
+    });
+    const result = await worker.recognize(pixelsToCanvas(image));
+    return result.data.text ?? '';
+  }, []);
 
-    if (!videoRef.current) {
-      fileInputRef.current?.click();
-      return;
-    }
-
+  /** The part of the live frame inside the on-screen box (plus a little margin), as pixels. */
+  const grabAimedCrop = useCallback((): Pixels | null => {
     const video = videoRef.current;
-    if (!canvasRef.current) {
-      canvasRef.current = document.createElement('canvas');
-    }
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const guide = guideRef.current;
+    if (!video || !guide || video.readyState < 2 || !video.videoWidth) return null;
 
-    const vw = video.videoWidth || 1280;
-    const vh = video.videoHeight || 720;
-    canvas.width = vw;
-    canvas.height = vh;
+    const v = video.getBoundingClientRect();
+    const g = guide.getBoundingClientRect();
+    const rect = computeCropRect(
+      { w: video.videoWidth, h: video.videoHeight },
+      { w: v.width, h: v.height },
+      { x: g.left - v.left, y: g.top - v.top, w: g.width, h: g.height }
+    );
+    const scale = Math.min(1, MAX_CROP_WIDTH / rect.w);
+    const w = Math.max(1, Math.round(rect.w * scale));
+    const h = Math.max(1, Math.round(rect.h * scale));
+    const canvas = frameCanvasRef.current ?? (frameCanvasRef.current = document.createElement('canvas'));
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return null;
+    ctx.drawImage(video, rect.x, rect.y, rect.w, rect.h, 0, 0, w, h);
+    const img = ctx.getImageData(0, 0, w, h);
+    return { width: w, height: h, data: img.data };
+  }, []);
 
-    // Draw full natural video frame
-    ctx.drawImage(video, 0, 0, vw, vh);
+  const finish = useCallback(
+    (code: string) => {
+      if (doneRef.current) return;
+      doneRef.current = true;
+      setDetectedCode(code);
+      setStatusMessage(`Detected ${code}`);
+      haptic('scanHit');
+      // Let the "Got it!" bubble be seen before moving on.
+      setTimeout(() => onScanResult(code), 800);
+    },
+    [onScanResult]
+  );
 
-    // Save snapshot preview
-    setCapturedImage(canvas.toDataURL('image/jpeg', 0.8));
+  // The hands-free loop: starts when both the camera and the reader are ready.
+  useEffect(() => {
+    if (hasPermission !== true || !engineReady) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const startedAt = Date.now();
+    setStatusMessage('');
 
-    performOcr(canvas);
-  };
+    const tick = async () => {
+      if (cancelled || doneRef.current) return;
+      if (!document.hidden) {
+        try {
+          const crop = grabAimedCrop();
+          if (crop) {
+            const text = await readCrop(crop, recognize);
+            const decision = sessionRef.current.ingest(text);
+            if (decision && !cancelled) {
+              finish(decision.code);
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn('Scan frame failed', err);
+        }
+        const waited = Date.now() - startedAt;
+        setStatusMessage(
+          waited > HINT_GIVE_UP_MS
+            ? 'Still nothing. Try more light, or type the number instead.'
+            : waited > HINT_CLOSER_MS
+            ? 'Move closer so the number fills the box, and hold steady.'
+            : ''
+        );
+      }
+      if (!cancelled && !doneRef.current) timer = setTimeout(tick, TICK_MS);
+    };
+    tick();
 
-  // Handle uploaded or native camera photo
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [hasPermission, engineReady, grabAimedCrop, recognize, finish]);
+
+  // A photo from the gallery or the phone's own camera: try the whole picture, then bands of it.
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
 
-    const img = new Image();
     const reader = new FileReader();
-
     reader.onload = (loadEvent) => {
       const src = loadEvent.target?.result as string;
       setCapturedImage(src);
-      img.onload = () => {
-        if (!canvasRef.current) {
-          canvasRef.current = document.createElement('canvas');
+      const img = new Image();
+      img.onload = async () => {
+        setIsReadingPhoto(true);
+        setStatusMessage('Reading the photo…');
+        try {
+          if (!workerRef.current) await initEngine();
+          const scale = Math.min(1, 2000 / img.width);
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          if (!ctx) throw new Error('no canvas');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const full: Pixels = {
+            width: canvas.width,
+            height: canvas.height,
+            data: ctx.getImageData(0, 0, canvas.width, canvas.height).data,
+          };
+          // A still photo cannot be re-read like live frames, so different passes over the same
+          // picture have to agree (the same two-reads rule as the camera).
+          const decision = await readPhoto(full, recognize, new ScanSession(indexRef.current));
+          if (decision) {
+            finish(decision.code);
+            return;
+          }
+          setStatusMessage('Could not find a NAFDAC number in that photo. Try a closer, sharper one, or type it.');
+        } catch (err) {
+          console.warn('Photo read failed', err);
+          setStatusMessage('Could not read that photo. Please type the number instead.');
+        } finally {
+          setIsReadingPhoto(false);
         }
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-
-        performOcr(canvas);
       };
       img.src = src;
     };
-
     reader.readAsDataURL(file);
   };
+
+  const scanning = hasPermission === true && engineReady && !detectedCode;
 
   return (
     <div className="flex flex-col min-h-screen bg-ground pb-8 pt-2">
@@ -284,12 +314,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
       {/* Top action bar */}
       <div className="bar">
-        <button
-          type="button"
-          className="rb"
-          aria-label="Back"
-          onClick={onClose}
-        >
+        <button type="button" className="rb" aria-label="Back" onClick={onClose}>
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 5l-7 7 7 7" />
           </svg>
@@ -309,13 +334,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         {/* Video / Camera layer with rounded corners */}
         <div className="absolute inset-0 rounded-[28px] overflow-hidden bg-camera">
           {hasPermission !== false ? (
-            <video
-              ref={videoRef}
-              playsInline
-              muted
-              autoPlay
-              className="w-full h-full object-cover"
-            />
+            <video ref={videoRef} playsInline muted autoPlay className="w-full h-full object-cover" />
           ) : (
             /* Viewfinder fallback when camera permission is unavailable */
             <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-on-camera">
@@ -337,28 +356,40 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             </div>
           )}
 
-          {/* Captured snapshot overlay while OCR runs */}
-          {capturedImage && isScanning && (
-            <img
-              src={capturedImage}
-              alt="Captured frame"
-              className="absolute inset-0 w-full h-full object-cover opacity-90"
-            />
+          {/* Photo overlay while a gallery photo is read */}
+          {capturedImage && isReadingPhoto && (
+            <img src={capturedImage} alt="Photo being read" className="absolute inset-0 w-full h-full object-cover opacity-90" />
           )}
 
-          {/* Animated Laser Scanning Line while recognizing */}
-          {isScanning && (
-            <div className="scan-laser" aria-hidden="true" />
-          )}
+          {/* Animated laser line while the reader is working */}
+          {(scanning || isReadingPhoto) && <div className="scan-laser" aria-hidden="true" />}
 
-          {/* Center Target Crosshairs / Alignment Guides */}
+          {/* Alignment guide: the number inside this box is what gets read */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-            <div className="w-64 h-32 border-2 border-white/50 rounded-lg flex items-center justify-center bg-black/15 shadow-sm">
+            <div
+              ref={guideRef}
+              className="w-64 h-32 border-2 border-white/50 rounded-lg flex items-center justify-center bg-black/15 shadow-sm"
+            >
               <span className="text-[11px] font-mono text-white uppercase tracking-widest font-bold">
-                {isScanning ? 'READING LABEL…' : 'ALIGN NAFDAC NO.'}
+                {detectedCode ? 'GOT IT' : scanning || isReadingPhoto ? 'READING…' : 'ALIGN NAFDAC NO.'}
               </span>
             </div>
           </div>
+
+          {/* Torch, where the phone has one */}
+          {torch.supported && hasPermission && (
+            <button
+              type="button"
+              onClick={toggleTorch}
+              aria-pressed={torch.on}
+              aria-label={torch.on ? 'Turn the light off' : 'Turn the light on'}
+              className="absolute right-3 top-3 z-20 w-11 h-11 rounded-full border-thin border-white/70 bg-black/35 text-white flex items-center justify-center"
+            >
+              <svg viewBox="0 0 24 24" width="22" height="22" fill={torch.on ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M13 2L4 14h7l-1 8 9-12h-7z" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* 4 Corner reticle brackets (.cb) */}
@@ -382,33 +413,23 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
       {/* Lower controls (.low) */}
       <div className="low flex flex-col gap-3">
-        {statusMessage ? (
-          <p className="text-xs font-bold text-center text-ink px-2">{statusMessage}</p>
-        ) : (
-          <p>Align the NAFDAC number inside the box and tap Scan Label.</p>
-        )}
-
-        {/* Primary Action Button: Scan Label (Active, not disabled!) */}
-        <Button
-          label={isScanning ? 'Reading label…' : 'Scan Label'}
-          width="full"
-          tone="primary"
-          disabled={isScanning}
-          onClick={handleCaptureAndScan}
-        />
+        <p
+          className={statusMessage ? 'text-xs font-bold text-center text-ink px-2' : undefined}
+          role="status"
+          aria-live="polite"
+        >
+          {statusMessage ||
+            (hasPermission === false
+              ? 'Upload a photo of the label, or type the number.'
+              : engineReady
+              ? 'Hold the NAFDAC number inside the box. It reads by itself.'
+              : 'Getting the reader ready…')}
+        </p>
 
         {/* Secondary Actions: Upload Photo / Type Instead */}
         <div className="grid grid-cols-2 gap-2">
-          <Button
-            label="Upload photo"
-            tone="secondary"
-            onClick={() => fileInputRef.current?.click()}
-          />
-          <Button
-            label="Type it instead"
-            tone="ghost"
-            onClick={onTypeInstead || onClose}
-          />
+          <Button label="Upload photo" tone="secondary" onClick={() => fileInputRef.current?.click()} />
+          <Button label="Type it instead" tone="ghost" onClick={onTypeInstead || onClose} />
         </div>
       </div>
     </div>

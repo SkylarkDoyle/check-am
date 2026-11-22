@@ -94,6 +94,7 @@ export interface ApiSyncBundle {
 }
 
 export interface ApiMetaResponse {
+  ai_lookup_enabled?: boolean;
   disclaimer: string;
   coverage: string[];
   product_count: number;

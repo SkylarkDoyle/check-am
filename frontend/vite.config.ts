@@ -23,6 +23,17 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'],
         runtimeCaching: [
           {
+            // Label reader (Tesseract) engine files. Cached after the first online scan so the
+            // camera reader also starts offline.
+            urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/npm\/(tesseract\.js(-core)?|@tesseract\.js-data).*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'tesseract-engine',
+              expiration: { maxEntries: 12, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] }
+            }
+          },
+          {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
             options: {

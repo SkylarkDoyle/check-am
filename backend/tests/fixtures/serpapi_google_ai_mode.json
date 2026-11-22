@@ -1,0 +1,35 @@
+{
+  "search_metadata": {"id": "6b02e46293a73fdad172b37f", "status": "Success", "total_time_taken": 3.09},
+  "search_parameters": {"engine": "google_ai_mode", "q": "original colgate toothpaste product should look like versus common signs of fakes.", "device": "desktop"},
+  "text_blocks": [
+    {"type": "paragraph", "snippet": "Spotting the difference between an authentic U.S.-market Colgate toothpaste and a counterfeit version comes down to checking specific packaging details, distributor info, and size markings.", "reference_indexes": [0]},
+    {"type": "heading", "snippet": "What Original Colgate Looks Like (U.S. Market)"},
+    {"type": "paragraph", "snippet": "According to guidelines from Colgate-Palmolive, genuine products feature these core markers:", "snippet_links": [{"text": "Colgate-Palmolive", "link": "https://www.colgatepalmolive.com/en-us/identifying-counterfeit-products"}]},
+    {"type": "list", "list": [
+      {"snippet": "Distributor Information: The lower right-hand corner of a panel on the box explicitly states: \"Distr. by Colgate-Palmolive, New York, NY 10022\"."},
+      {"snippet": "UPC Barcode: The white box containing the UPC barcode starts with the prefix code 35000."},
+      {"snippet": "Legitimate Sizes: Tube and carton sizes match standard U.S. retail configurations."},
+      {"snippet": "Print Quality: Crisp, high-resolution lettering with clean alignment, proper spacing, and zero grammatical or spelling errors."}
+    ]},
+    {"type": "heading", "snippet": "Common Signs of Counterfeit Colgate"},
+    {"type": "paragraph", "snippet": "Imitation or illegally manufactured tubes often give themselves away through sloppy mistakes or unauthorized origin labels:"},
+    {"type": "list", "list": [
+      {"snippet": "Abnormal Tube Sizes: Labeled as a 5 ounce (or 100 ml) tube, a capacity that Colgate does not sell in the U.S."},
+      {"snippet": "Obvious Typos & Misspellings: Common dead giveaways printed directly on the carton include words like:", "list": [
+        {"snippet": "\"isclinically\" (instead of is clinically)"},
+        {"snippet": "\"SOUTH AFRLCA\" (typo in South Africa)"}
+      ]},
+      {"snippet": "Poor Packaging Quality: Faded colors, misaligned seals, cheap plastic crimps on the tube, or an unusual chemical odor."}
+    ]},
+    {"type": "heading", "snippet": "What to Do If You Suspect a Fake"},
+    {"type": "list", "list": [
+      {"snippet": "Do not use it: Counterfeit personal care products can skip safety controls and pose hidden health risks."},
+      {"snippet": "Contact Colgate: You can reach the official Colgate-Palmolive consumer information line directly at 1-800-468-6502."}
+    ]},
+    {"type": "paragraph", "snippet": "If you have a tube in front of you, tell me what size or manufacturer address is printed on it, and we can check it against known details."}
+  ],
+  "references": [
+    {"index": 0, "title": "Identifying Counterfeit Products | Colgate-Palmolive", "link": "https://www.colgatepalmolive.com/en-us/identifying-counterfeit-products", "snippet": "Counterfeit Indicators ...", "source": "Colgate-Palmolive", "source_icon": "https://encrypted-tbn2.gstatic.com/faviconV2?url=https://www.colgatepalmolive.com&client=AIM&size=32&type=FAVICON&fallback_opts=TYPE,SIZE,URL", "thumbnail": "https://encrypted-tbn3.gstatic.com/images?q=tbn:ANd9GcQ"},
+    {"index": 1, "title": "Insecure source", "link": "http://example.com/plain-http", "source": "Example"}
+  ]
+}

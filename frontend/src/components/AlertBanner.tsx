@@ -183,21 +183,21 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
             </span>
             <button
               type="button"
-              className="w-5 h-5 flex items-center justify-center rounded-full bg-alert/15 hover:bg-alert/30 text-alert transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-full border-thin border-alert bg-[#a8200f]/15 hover:bg-[#a8200f]/30 text-alert transition-colors"
               onClick={handlePrev}
               aria-label="Previous alert"
             >
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M15 18l-6-6 6-6" />
               </svg>
             </button>
             <button
               type="button"
-              className="w-5 h-5 flex items-center justify-center rounded-full bg-alert/15 hover:bg-alert/30 text-alert transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-full border-thin border-alert bg-[#a8200f]/15 hover:bg-[#a8200f]/30 text-alert transition-colors"
               onClick={handleNext}
               aria-label="Next alert"
             >
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 18l6-6-6-6" />
               </svg>
             </button>

@@ -13,6 +13,9 @@ import {
 } from '../components';
 import { Product, ProductCategory } from '../types';
 import { repository, SearchResultItem } from '../data/repository';
+import { AiEntryCard, AiLookupSheet } from '../components/ai';
+import { AI_FIXTURES, useAiLookup } from '../hooks/useAiLookup';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 interface SearchScreenProps {
   initialQuery?: string;
@@ -36,6 +39,16 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
   const [syncDate, setSyncDate] = useState<string>('');
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isOnline = useOnlineStatus();
+  const ai = useAiLookup();
+
+  // QA only: ?ai=loading|result|nothing|limit opens that AI sheet state directly.
+  useEffect(() => {
+    if (!AI_FIXTURES) return;
+    const which = new URLSearchParams(window.location.search).get('ai');
+    if (which) ai.preview(which, initialQuery || 'Colgate toothpaste');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     repository.getCatalogMeta().then((meta) => {
@@ -67,6 +80,13 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
       }
     };
   }, [query, category]);
+
+  // The AI card needs a typed question that found nothing, and a network connection.
+  const showAiCard = !loading && results.length === 0 && query.trim().length >= 3 && isOnline;
+  const { refreshUsage } = ai;
+  useEffect(() => {
+    if (showAiCard) refreshUsage();
+  }, [showAiCard, refreshUsage]);
 
   return (
     <div className="flex flex-col min-h-screen bg-ground pb-28 pt-2">
@@ -181,11 +201,16 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
             <div className="panel w-full text-left mt-2" style={{ paddingBottom: 'var(--spacing-3)' }}>
               <h3 className="font-display font-black text-[17px] pt-1">Before you decide</h3>
               <ChecklistItem
-                title="Check the number you typed"
+                title="Check what you typed"
                 detail="Compare each character with the pack."
                 state="flag"
               />
             </div>
+
+            {/* Optional AI lookup: only here, only for what the person typed */}
+            {showAiCard && ai.enabled && (
+              <AiEntryCard remaining={ai.remaining} onAsk={() => ai.run(query.trim())} />
+            )}
 
             {/* Scan the label button */}
             <div className="w-full pt-2">
@@ -199,6 +224,25 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
           </div>
         )}
       </main>
+
+      {ai.enabled && (
+        <AiLookupSheet
+          isOpen={ai.open}
+          state={ai.state}
+          query={ai.query}
+          remaining={ai.remaining}
+          limit={ai.limit}
+          onClose={ai.close}
+          onScan={() => {
+            ai.close();
+            onOpenScan();
+          }}
+          onEditSearch={() => {
+            ai.close();
+            setTimeout(() => document.querySelector<HTMLInputElement>('input')?.focus(), 50);
+          }}
+        />
+      )}
 
       {/* Persistent Bottom TabBar */}
       {onNavigateTab && <TabBar active="home" onSelect={onNavigateTab} />}

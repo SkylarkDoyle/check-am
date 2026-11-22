@@ -11,6 +11,7 @@ import {
   ApiSyncManifest,
   ApiUiCategory,
 } from './types';
+import type { AiLookupResult, AiUsage } from '../components/ai/types';
 
 export class CheckAmApiError extends Error {
   code: string;
@@ -157,5 +158,27 @@ export const api = {
 
   async getMeta(signal?: AbortSignal): Promise<ApiMetaResponse> {
     return fetchWithTimeout<ApiMetaResponse>('/meta', { signal });
+  },
+
+  /** How many AI lookups this device has left today. Costs nothing. */
+  async aiLookupUsage(deviceId: string, signal?: AbortSignal): Promise<AiUsage & { enabled: boolean }> {
+    return fetchWithTimeout<AiUsage & { enabled: boolean }>('/ai-lookup/usage', {
+      headers: { 'X-Device-Id': deviceId },
+      signal,
+    });
+  },
+
+  /** The AI lookup. The server holds the key, the cache and the daily limit. */
+  async aiLookup(query: string, deviceId: string, signal?: AbortSignal): Promise<AiLookupResult> {
+    return fetchWithTimeout<AiLookupResult>(
+      '/ai-lookup',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Device-Id': deviceId },
+        body: JSON.stringify({ q: query }),
+        signal,
+      },
+      45000
+    );
   },
 };

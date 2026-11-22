@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -123,9 +123,35 @@ class SyncManifest(BaseModel):
 
 
 class MetaResponse(BaseModel):
+    ai_lookup_enabled: bool = False
     disclaimer: str
     coverage: list[str]
     product_count: int
     alert_count: int
     last_synced_at: str
     version: str
+
+
+class AiLookupRequest(BaseModel):
+    q: str = Field(min_length=1, max_length=200)
+
+
+class AiUsage(BaseModel):
+    limit: int
+    remaining: int
+    resets_at: str
+
+
+class AiUsageResponse(AiUsage):
+    enabled: bool
+
+
+class AiLookupResponse(BaseModel):
+    query: str
+    result: Literal["ok", "none"]
+    cached: bool
+    generated_at: str | None = None
+    blocks: list[dict[str, Any]] = Field(default_factory=list)
+    sources: list[dict[str, Any]] = Field(default_factory=list)
+    usage: AiUsage
+    disclaimer: str = "AI responses may include mistakes."

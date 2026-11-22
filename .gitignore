@@ -67,3 +67,8 @@ Thumbs.db
 # ---- Design extraction dumps (decide: keep tokens, ignore big dumps) ----
 doop/**/*_dump.json
 doop/**/*_extracted.json
+
+# Generated OCR benchmark variants (see frontend/scripts/ocr-fixtures.py)
+frontend/test-fixtures/packs/variants/
+# Tesseract language data the OCR tests cache in the working directory
+*.traineddata

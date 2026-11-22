@@ -9,6 +9,7 @@ import { AboutScreen } from './screens/AboutScreen';
 import { ResultScreenSkeleton } from './components';
 import { Product, SafetyAlert } from './types';
 import { initDatabase } from './db';
+import { initHaptics } from './lib/haptics';
 import { repository } from './data/repository';
 
 interface ResultRouteProps {
@@ -123,7 +124,7 @@ export const App: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    initDatabase();
+    initDatabase().then(() => initHaptics());
     if ('scrollRestoration' in window.history) {
       window.history.scrollRestoration = 'manual';
     }

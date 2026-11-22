@@ -16,6 +16,8 @@ html, body {
   padding: 0;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  /* clip (not hidden) keeps position: sticky working for the checklist bar */
+  overflow-x: clip;
 }
 
 /* Hide scrollbars globally across the app while preserving scrolling capability */
