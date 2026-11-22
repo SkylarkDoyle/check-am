@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ImageOff } from 'lucide-react';
 
 export interface ThumbProps {
   kind?: 'tin' | 'bottle' | 'sachet' | 'tube';
@@ -7,6 +8,8 @@ export interface ThumbProps {
   imageUrl?: string;
   alt?: string;
   className?: string;
+  /** What to show without a photo: a category illustration, or a plain "No image yet" note. */
+  fallback?: 'illustration' | 'no-image';
 }
 
 export const Thumb: React.FC<ThumbProps> = ({
@@ -16,6 +19,7 @@ export const Thumb: React.FC<ThumbProps> = ({
   imageUrl,
   alt = '',
   className = '',
+  fallback = 'illustration',
 }) => {
   const [imgError, setImgError] = useState(false);
 
@@ -42,6 +46,22 @@ export const Thumb: React.FC<ThumbProps> = ({
           loading="lazy"
           referrerPolicy="no-referrer"
         />
+      ) : fallback === 'no-image' ? (
+        <div className="flex flex-col items-center justify-center gap-1 px-1 text-center text-ink-muted">
+          <ImageOff
+            aria-hidden="true"
+            strokeWidth={2}
+            style={{ width: size === 'lg' ? 28 : 18, height: size === 'lg' ? 28 : 18 }}
+          />
+          {size !== 'sm' && (
+            <span
+              className="font-bold leading-tight"
+              style={{ fontSize: size === 'lg' ? 12 : 10 }}
+            >
+              No image yet
+            </span>
+          )}
+        </div>
       ) : (
         <>
           {kind === 'tin' && (

@@ -9,7 +9,7 @@
   font-weight: var(--font-weight-display);
   font-size: var(--text-display);
   line-height: var(--leading-tight);
-  max-width: 205px;
+  max-width: 175px; /* keeps "before you" clear of the illustration */
   letter-spacing: var(--tracking-display);
 }
 
@@ -96,6 +96,8 @@
 @keyframes tc3 { 0%, 5.10% { opacity: 0; } 5.11%, 42% { opacity: 1; } 46%, 100% { opacity: 0; } }
 @keyframes cc3 { 0%, 5.10% { opacity: 0; } 5.11%, 5.80% { opacity: 1; } 5.81%, 100% { opacity: 0; } }
 
+@keyframes tc4 { 0%, 5.80% { opacity: 0; } 5.81%, 42% { opacity: 1; } 46%, 100% { opacity: 0; } }
+@keyframes cc4 { 0%, 5.80% { opacity: 0; } 5.81%, 6.50% { opacity: 1; } 6.51%, 100% { opacity: 0; } }
 @keyframes tc5 { 0%, 6.50% { opacity: 0; } 6.51%, 42% { opacity: 1; } 46%, 100% { opacity: 0; } }
 @keyframes cc5 { 0%, 6.50% { opacity: 0; } 6.51%, 7.20% { opacity: 1; } 7.21%, 100% { opacity: 0; } }
 @keyframes tc6 { 0%, 7.20% { opacity: 0; } 7.21%, 42% { opacity: 1; } 46%, 100% { opacity: 0; } }
@@ -110,6 +112,8 @@
 @keyframes tc11 { 0%, 10.70% { opacity: 0; } 10.71%, 42% { opacity: 1; } 46%, 100% { opacity: 0; } }
 @keyframes cc11 { 0%, 10.70% { opacity: 0; } 10.71%, 11.40% { opacity: 1; } 11.41%, 100% { opacity: 0; } }
 
+@keyframes tc12 { 0%, 11.40% { opacity: 0; } 11.41%, 42% { opacity: 1; } 46%, 100% { opacity: 0; } }
+@keyframes cc12 { 0%, 11.40% { opacity: 0; } 11.41%, 12.10% { opacity: 1; } 12.11%, 100% { opacity: 0; } }
 @keyframes tc13 { 0%, 12.10% { opacity: 0; } 12.11%, 42% { opacity: 1; } 46%, 100% { opacity: 0; } }
 @keyframes cc13 { 0%, 12.10% { opacity: 0; } 12.11%, 12.80% { opacity: 1; } 12.81%, 100% { opacity: 0; } }
 @keyframes tc14 { 0%, 12.80% { opacity: 0; } 12.81%, 42% { opacity: 1; } 46%, 100% { opacity: 0; } }

@@ -276,7 +276,7 @@ Inspect the pack yourself. CheckAm shows what the NAFDAC registry says. It does 
             aria-label="View larger image"
             onClick={() => setImagePreviewOpen(true)}
           >
-            <Thumb kind={product.kind || 'tin'} imageUrl={product.external_image_url || undefined} size="72" />
+            <Thumb kind={product.kind || 'tin'} imageUrl={product.external_image_url || undefined} size="72" fallback="no-image" />
             <span className="absolute -right-1.5 -bottom-1.5 w-7 h-7 rounded-full bg-accent text-on-accent border-2 border-surface flex items-center justify-center">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M16 20h4v-4" />
@@ -353,7 +353,7 @@ Inspect the pack yourself. CheckAm shows what the NAFDAC registry says. It does 
             <img src={product.external_image_url} alt={product.product_name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
           ) : (
             <div className="w-[84%] flex items-center justify-center">
-              <Thumb kind={product.kind || 'tin'} size="lg" className="w-28 h-28" />
+              <Thumb kind={product.kind || 'tin'} size="lg" className="w-28 h-28" fallback="no-image" />
             </div>
           )}
         </div>
@@ -377,7 +377,7 @@ Inspect the pack yourself. CheckAm shows what the NAFDAC registry says. It does 
             <img src={product.external_image_url} alt={product.product_name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
           ) : (
             <div className="w-[84%] flex items-center justify-center">
-              <Thumb kind={product.kind || 'tin'} size="lg" className="w-28 h-28" />
+              <Thumb kind={product.kind || 'tin'} size="lg" className="w-28 h-28" fallback="no-image" />
             </div>
           )}
         </div>

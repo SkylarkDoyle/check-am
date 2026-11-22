@@ -27,6 +27,37 @@ interface HomeScreenProps {
 
 const PAGE_SIZE = 20;
 
+const HERO_HEADLINE = 'Check it before you buy it';
+const HERO_SUBLINE = 'Look up any food, drink or medicine in the NAFDAC registry, or scan the pack.';
+
+/** One animated span per character. Animation names (tcN/ccN) follow the character position. */
+const HeroHeadline: React.FC = () => {
+  let pos = 0;
+  return (
+    <>
+      {HERO_HEADLINE.split(' ').map((word, wi) => {
+        const letters = [...word].map((ch) => {
+          const i = pos++;
+          return (
+            <span className="c" key={i} style={{ animationName: `tc${i}` }}>
+              {ch}
+              <i className="k" style={{ animationName: `cc${i}` }}></i>
+            </span>
+          );
+        });
+        pos++; // the space after the word
+        return (
+          <React.Fragment key={wi}>
+            {wi > 0 ? ' ' : null}
+            <span className="w">{letters}</span>
+          </React.Fragment>
+        );
+      })}
+    </>
+  );
+};
+
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigateProduct,
   onOpenScan,
@@ -161,54 +192,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <FoodArt />
           </span>
 
-          <small className="font-bold text-[13px] opacity-90">Hello, shopper</small>
-
-          {/* 10s CSS Animated Typing Headline & Logo Phase */}
-          <div className="stage" role="heading" aria-level={1} aria-label="What are you buying today? CheckAm.">
-            <h1 aria-hidden="true" className="font-display font-black text-display leading-tight max-w-[205px] tracking-display">
-              <span className="w">
-                <span className="c" style={{ animationName: 'tc0' }}>W<i className="k" style={{ animationName: 'cc0' }}></i></span>
-                <span className="c" style={{ animationName: 'tc1' }}>h<i className="k" style={{ animationName: 'cc1' }}></i></span>
-                <span className="c" style={{ animationName: 'tc2' }}>a<i className="k" style={{ animationName: 'cc2' }}></i></span>
-                <span className="c" style={{ animationName: 'tc3' }}>t<i className="k" style={{ animationName: 'cc3' }}></i></span>
-              </span>{' '}
-              <span className="w">
-                <span className="c" style={{ animationName: 'tc5' }}>a<i className="k" style={{ animationName: 'cc5' }}></i></span>
-                <span className="c" style={{ animationName: 'tc6' }}>r<i className="k" style={{ animationName: 'cc6' }}></i></span>
-                <span className="c" style={{ animationName: 'tc7' }}>e<i className="k" style={{ animationName: 'cc7' }}></i></span>
-              </span>{' '}
-              <span className="w">
-                <span className="c" style={{ animationName: 'tc9' }}>y<i className="k" style={{ animationName: 'cc9' }}></i></span>
-                <span className="c" style={{ animationName: 'tc10' }}>o<i className="k" style={{ animationName: 'cc10' }}></i></span>
-                <span className="c" style={{ animationName: 'tc11' }}>u<i className="k" style={{ animationName: 'cc11' }}></i></span>
-              </span>{' '}
-              <span className="w">
-                <span className="c" style={{ animationName: 'tc13' }}>b<i className="k" style={{ animationName: 'cc13' }}></i></span>
-                <span className="c" style={{ animationName: 'tc14' }}>u<i className="k" style={{ animationName: 'cc14' }}></i></span>
-                <span className="c" style={{ animationName: 'tc15' }}>y<i className="k" style={{ animationName: 'cc15' }}></i></span>
-                <span className="c" style={{ animationName: 'tc16' }}>i<i className="k" style={{ animationName: 'cc16' }}></i></span>
-                <span className="c" style={{ animationName: 'tc17' }}>n<i className="k" style={{ animationName: 'cc17' }}></i></span>
-                <span className="c" style={{ animationName: 'tc18' }}>g<i className="k" style={{ animationName: 'cc18' }}></i></span>
-              </span>{' '}
-              <span className="w">
-                <span className="c" style={{ animationName: 'tc20' }}>t<i className="k" style={{ animationName: 'cc20' }}></i></span>
-                <span className="c" style={{ animationName: 'tc21' }}>o<i className="k" style={{ animationName: 'cc21' }}></i></span>
-                <span className="c" style={{ animationName: 'tc22' }}>d<i className="k" style={{ animationName: 'cc22' }}></i></span>
-                <span className="c" style={{ animationName: 'tc23' }}>a<i className="k" style={{ animationName: 'cc23' }}></i></span>
-                <span className="c" style={{ animationName: 'tc24' }}>y<i className="k" style={{ animationName: 'cc24' }}></i></span>
-                <span className="c" style={{ animationName: 'tc25' }}>?<i className="k" style={{ animationName: 'cc25' }}></i></span>
-              </span>
+          {/* Typing headline (animated per character, then the logo phase) */}
+          <div className="stage" role="heading" aria-level={1} aria-label={`${HERO_HEADLINE}. CheckAm.`}>
+            <h1 aria-hidden="true" className="font-display font-black text-display leading-tight max-w-[175px] tracking-display">
+              <HeroHeadline />
             </h1>
 
-            {/* Logo Phase */}
+          {/* Logo Phase */}
             <div className="lg" aria-hidden="true">
               <Logo tone="onaccent" layout="stacked" align="start" size="md" />
             </div>
           </div>
 
+          <p className="text-[14px] leading-snug opacity-90 max-w-[260px]">
+            {HERO_SUBLINE}
+          </p>
+
           {/* SearchBar with Scan Shortcut */}
           <SearchBar
-            placeholder="Search name or NAFDAC no."
+            placeholder="Name or NAFDAC no."
             onFocus={() => onOpenSearch()}
             onScan={onOpenScan}
           />

@@ -56,7 +56,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       }}
     >
       <div className="ca-card-th flex-none">
-        {thumbSlot || <Thumb kind={kind} imageUrl={imageUrl} size={layout === 'tile' ? 'md' : 'md'} />}
+        {thumbSlot || <Thumb kind={kind} imageUrl={imageUrl} size={layout === 'tile' ? 'md' : 'md'} fallback="no-image" />}
       </div>
       <div className="ca-card-b">
         <h3 className="ca-card-n">{brand}</h3>
