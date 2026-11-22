@@ -20,6 +20,13 @@ class RunReport:
     shared_reg_numbers: int = 0  # reg numbers carrying several distinct products (all kept)
     pruned: int = 0  # rows of this source not seen in a complete --prune run (deleted)
     images_set: int = 0
+    # image_enrich only
+    queried: int = 0  # provider queries sent
+    matched: int = 0  # products given an image (or that would be, in --dry-run)
+    rejected_low_score: int = 0  # candidates dropped by the quality gate
+    invalid_url: int = 0  # accepted candidates whose URL failed validation
+    provider_errors: int = 0  # products where the provider kept failing
+    throttled: int = 0  # throttling responses from the provider
     errors: list[str] = field(default_factory=list)
 
     def complete(self) -> None:

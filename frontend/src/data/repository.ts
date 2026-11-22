@@ -156,12 +156,19 @@ export const repository = {
   },
 
   async listAlerts(limit = 20): Promise<SafetyAlert[]> {
-    const local = await db.alerts.limit(limit).toArray();
-    if (local.length > 0) return local;
+    const local = await db.alerts.toArray();
+    if (local.length > 0) {
+      return local
+        .sort((a, b) => new Date(b.issued_date || 0).getTime() - new Date(a.issued_date || 0).getTime())
+        .slice(0, limit);
+    }
 
     try {
       const apiAlerts = await api.listAlerts(true, limit);
-      return apiAlerts.map(mapApiAlertToModel);
+      const mapped = apiAlerts.map(mapApiAlertToModel);
+      return mapped
+        .sort((a, b) => new Date(b.issued_date || 0).getTime() - new Date(a.issued_date || 0).getTime())
+        .slice(0, limit);
     } catch {
       return [];
     }

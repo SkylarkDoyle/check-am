@@ -71,7 +71,7 @@
   }
 }
 
-@keyframes pulse {
+@keyframes ca-beacon-pulse {
   0% {
     box-shadow: 0 0 0 0 rgba(23, 107, 48, 0.55);
   }

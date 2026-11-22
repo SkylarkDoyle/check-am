@@ -9,8 +9,50 @@ interface ScanScreenProps {
   onTypeInstead?: () => void;
 }
 
-// Valid NAFDAC regex: 2 characters (alphanumeric, e.g. 01, A4, B2, 04, A8), optional dash/space, then 4-8 alphanumeric chars with at least 3 digits
-const NAFDAC_REGEX = /\b([0-9A-Z]{2})[- ]?([0-9]{4,8}[A-Z]?)\b/i;
+/**
+ * Extracts potential NAFDAC registration numbers from OCR text.
+ * Covers all valid Nigerian registry formats without artificial prefix restrictions:
+ * - Hyphenated e.g. 04-0023, A8-101168L, B1-3599, A4-1070, A11-1222, 01-0022
+ * - Slashes e.g. 04/0023, A8/101168L
+ * - Spaced e.g. A8 101168L, 04 0023
+ * - Continuous alphanumeric e.g. A8101168L, 040023
+ * - Following labels: NAFDAC NO, NRN, REG NO
+ */
+export function extractNafdacCandidates(text: string): string[] {
+  if (!text) return [];
+  const candidates: string[] = [];
+
+  // Pattern 1: Explicit NAFDAC / REG prefix context
+  const labeledMatches = text.matchAll(/(?:NAFDAC|REG|NRN)[^A-Za-z0-9]*([A-Za-z0-9]{1,4}[-/ ]?[0-9]{3,8}[A-Za-z]?)/gi);
+  for (const m of labeledMatches) {
+    const raw = m[1].replace(/[\s/]/g, '-').toUpperCase();
+    if (/\d/.test(raw) && raw.length >= 4) {
+      candidates.push(raw);
+    }
+  }
+
+  // Pattern 2: Standard alphanumeric code with hyphen or slash (e.g. 04-0023, A8-101902L, A11-1222)
+  const standardMatches = text.matchAll(/\b([A-Za-z0-9]{1,4})[-/ ]([0-9]{3,8}[A-Za-z]?)\b/gi);
+  for (const m of standardMatches) {
+    const code = `${m[1].toUpperCase()}-${m[2].toUpperCase()}`;
+    if (/\d/.test(code)) {
+      candidates.push(code);
+    }
+  }
+
+  // Pattern 3: Standalone alphanumeric tokens with 5 to 14 characters containing digits
+  const tokens = text.split(/[\s,;:|()\[\]]+/);
+  for (const token of tokens) {
+    const clean = token.replace(/[^A-Za-z0-9-]/g, '').toUpperCase();
+    // Must contain at least 3 digits and be 5-14 chars
+    const digitCount = (clean.match(/\d/g) || []).length;
+    if (clean.length >= 5 && clean.length <= 14 && digitCount >= 3) {
+      candidates.push(clean);
+    }
+  }
+
+  return Array.from(new Set(candidates));
+}
 
 export const ScanScreen: React.FC<ScanScreenProps> = ({
   onScanResult,
@@ -20,17 +62,17 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   const isOnline = useOnlineStatus();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [detectedCode, setDetectedCode] = useState<string>('');
-  const [isRecognized, setIsRecognized] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
   const [isOcrReady, setIsOcrReady] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string>('');
   const [totalCount, setTotalCount] = useState<number | undefined>(undefined);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const workerRef = useRef<any>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isProcessingRef = useRef(false);
-  const lastReadRef = useRef<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     repository.getCatalogMeta().then((meta) => {
@@ -42,7 +84,6 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
     return () => {
       stopCamera();
-      if (intervalRef.current) clearInterval(intervalRef.current);
       if (workerRef.current) {
         workerRef.current.terminate().catch(() => {});
         workerRef.current = null;
@@ -54,9 +95,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     try {
       const { createWorker } = await import('tesseract.js');
       const worker = await createWorker('eng');
+      // Full character set without restrictive whitelisting so dashes and labels are preserved
       await worker.setParameters({
-        tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-',
-        tessedit_pageseg_mode: '7' as any, // Single line text mode
+        tessedit_pageseg_mode: '6' as any, // Assume a single uniform block of text
       });
       workerRef.current = worker;
       setIsOcrReady(true);
@@ -71,22 +112,30 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         setHasPermission(false);
         return;
       }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      });
+
+      let stream: MediaStream;
+      try {
+        // Try high-resolution back camera first
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+        });
+      } catch {
+        // Fallback to any default camera available
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+        });
+      }
+
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play().catch(() => {});
       }
       setHasPermission(true);
-
-      // Start capture loop once camera is streaming
-      intervalRef.current = setInterval(processFrame, 500);
     } catch {
       setHasPermission(false);
     }
@@ -99,84 +148,140 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     }
   };
 
-  // Narrow centre strip extraction, grayscale & contrast stretching
-  const processFrame = async () => {
-    if (isProcessingRef.current || !workerRef.current || !videoRef.current) return;
-    const video = videoRef.current;
-    if (video.readyState < 2) return; // HAVE_CURRENT_DATA
-
-    isProcessingRef.current = true;
+  // Perform OCR on an image source (from video capture or uploaded file)
+  const performOcr = async (sourceCanvas: HTMLCanvasElement) => {
+    setIsScanning(true);
+    setStatusMessage('Reading pack label…');
 
     try {
-      if (!canvasRef.current) {
-        canvasRef.current = document.createElement('canvas');
+      if (!workerRef.current) {
+        // Fallback init worker if not ready yet
+        const { createWorker } = await import('tesseract.js');
+        const worker = await createWorker('eng');
+        await worker.setParameters({
+          tessedit_pageseg_mode: '6' as any,
+        });
+        workerRef.current = worker;
+        setIsOcrReady(true);
       }
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      if (!ctx) return;
 
-      const vw = video.videoWidth || 640;
-      const vh = video.videoHeight || 480;
-
-      // Extract centre 70% width and centre 25% height strip
-      const cropW = Math.min(vw * 0.7, 720);
-      const cropH = vh * 0.25;
-      const cropX = (vw - cropW) / 2;
-      const cropY = (vh - cropH) / 2;
-
-      canvas.width = cropW;
-      canvas.height = cropH;
-
-      ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-
-      // Grayscale & contrast enhancement
-      const imgData = ctx.getImageData(0, 0, cropW, cropH);
-      const data = imgData.data;
-      for (let i = 0; i < data.length; i += 4) {
-        // Luminance
-        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-        // High contrast thresholding
-        const val = gray > 120 ? 255 : 0;
-        data[i] = val;
-        data[i + 1] = val;
-        data[i + 2] = val;
-      }
-      ctx.putImageData(imgData, 0, 0);
-
-      // Perform OCR on preprocessed canvas
-      const ret = await workerRef.current.recognize(canvas);
+      const ret = await workerRef.current.recognize(sourceCanvas);
       const rawText = ret?.data?.text?.trim() || '';
+      console.info('OCR text detected:', rawText);
 
-      const match = rawText.match(NAFDAC_REGEX);
-      if (match) {
-        const candidate = `${match[1].toUpperCase()}-${match[2].toUpperCase()}`;
-        // Consecutive double-read check
-        if (lastReadRef.current === candidate) {
-          setDetectedCode(candidate);
-          setIsRecognized(true);
+      const candidates = extractNafdacCandidates(rawText);
 
-          if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-            try {
-              navigator.vibrate(50);
-            } catch {
-              // ignore
-            }
+      if (candidates.length > 0) {
+        // Try finding a direct registry match among candidates
+        let matchedCode: string | null = null;
+        for (const candidate of candidates) {
+          const lookup = await repository.lookupReg(candidate);
+          if (lookup.result === 'match' && lookup.products.length > 0) {
+            matchedCode = lookup.products[0].nafdac_reg_num;
+            break;
           }
-        } else {
-          lastReadRef.current = candidate;
         }
-      } else {
-        lastReadRef.current = null;
+
+        const finalCode = matchedCode || candidates[0];
+        setDetectedCode(finalCode);
+        setStatusMessage(`Detected ${finalCode}`);
+
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+          try {
+            navigator.vibrate(50);
+          } catch {
+            // ignore
+          }
+        }
+
+        // Trigger result navigation immediately
+        onScanResult(finalCode);
+        return;
       }
-    } catch {
-      // frame processing error caught safely
+
+      setStatusMessage('Could not read number clearly. Hold closer or type it below.');
+    } catch (err) {
+      console.warn('OCR scan error:', err);
+      setStatusMessage('Scan failed. Please type the number or try another photo.');
     } finally {
-      isProcessingRef.current = false;
+      setIsScanning(false);
     }
+  };
+
+  // User explicitly clicks "Scan Label" to capture the live frame and OCR it
+  const handleCaptureAndScan = () => {
+    if (isScanning) return;
+
+    if (!videoRef.current) {
+      fileInputRef.current?.click();
+      return;
+    }
+
+    const video = videoRef.current;
+    if (!canvasRef.current) {
+      canvasRef.current = document.createElement('canvas');
+    }
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const vw = video.videoWidth || 1280;
+    const vh = video.videoHeight || 720;
+    canvas.width = vw;
+    canvas.height = vh;
+
+    // Draw full natural video frame
+    ctx.drawImage(video, 0, 0, vw, vh);
+
+    // Save snapshot preview
+    setCapturedImage(canvas.toDataURL('image/jpeg', 0.8));
+
+    performOcr(canvas);
+  };
+
+  // Handle uploaded or native camera photo
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const img = new Image();
+    const reader = new FileReader();
+
+    reader.onload = (loadEvent) => {
+      const src = loadEvent.target?.result as string;
+      setCapturedImage(src);
+      img.onload = () => {
+        if (!canvasRef.current) {
+          canvasRef.current = document.createElement('canvas');
+        }
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        performOcr(canvas);
+      };
+      img.src = src;
+    };
+
+    reader.readAsDataURL(file);
   };
 
   return (
     <div className="flex flex-col min-h-screen bg-ground pb-8 pt-2">
+      {/* Hidden file input for photo snap or gallery upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
       {/* Top action bar */}
       <div className="bar">
         <button
@@ -202,8 +307,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         )}
 
         {/* Video / Camera layer with rounded corners */}
-        <div className="absolute inset-0 rounded-[28px] overflow-hidden">
-          {hasPermission !== false && (
+        <div className="absolute inset-0 rounded-[28px] overflow-hidden bg-camera">
+          {hasPermission !== false ? (
             <video
               ref={videoRef}
               playsInline
@@ -211,32 +316,46 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
               autoPlay
               className="w-full h-full object-cover"
             />
-          )}
-
-          {/* Viewfinder fallback when camera unavailable */}
-          {hasPermission === false && (
-            <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-camera text-on-camera">
-              <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-70 mb-2">
+          ) : (
+            /* Viewfinder fallback when camera permission is unavailable */
+            <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-on-camera">
+              <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-80 mb-3 text-surface">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
                 <circle cx="12" cy="13" r="4"></circle>
               </svg>
-              <p className="font-bold text-sm mb-1">Camera viewfinder active</p>
-              <p className="text-xs text-white/70 max-w-[240px]">
-                Align pack label with NAFDAC registration number inside the frame.
+              <p className="font-bold text-base mb-1.5">Camera not accessible</p>
+              <p className="text-xs text-white/80 max-w-[260px] mb-4">
+                You can take or upload a photo of the pack label directly from your phone.
               </p>
+              <button
+                type="button"
+                className="px-4 py-2 bg-surface text-ink font-bold text-xs rounded-pill shadow-md hover:bg-surface-alt transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                Choose or Take Photo
+              </button>
             </div>
           )}
 
+          {/* Captured snapshot overlay while OCR runs */}
+          {capturedImage && isScanning && (
+            <img
+              src={capturedImage}
+              alt="Captured frame"
+              className="absolute inset-0 w-full h-full object-cover opacity-90"
+            />
+          )}
+
           {/* Animated Laser Scanning Line while recognizing */}
-          {!isRecognized && (
+          {isScanning && (
             <div className="scan-laser" aria-hidden="true" />
           )}
 
           {/* Center Target Crosshairs / Alignment Guides */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-            <div className="w-60 h-28 border border-white/40 rounded-lg flex items-center justify-center bg-black/10">
-              <span className="text-[11px] font-mono text-white/80 uppercase tracking-widest font-bold">
-                ALIGN NAFDAC NO.
+            <div className="w-64 h-32 border-2 border-white/50 rounded-lg flex items-center justify-center bg-black/15 shadow-sm">
+              <span className="text-[11px] font-mono text-white uppercase tracking-widest font-bold">
+                {isScanning ? 'READING LABEL…' : 'ALIGN NAFDAC NO.'}
               </span>
             </div>
           </div>
@@ -249,7 +368,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         <span className="cb" style={{ right: '16px', bottom: '60px', borderLeft: 0, borderTop: 0 }}></span>
 
         {/* Recognition Speech Bubble - Positioned ON TOP over viewfinder */}
-        {isRecognized && detectedCode && (
+        {detectedCode && (
           <div
             className="bub bub-pop cursor-pointer hover:scale-105 active:scale-95 transition-transform z-30"
             onClick={() => onScanResult(detectedCode)}
@@ -262,19 +381,35 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       </div>
 
       {/* Lower controls (.low) */}
-      <div className="low">
-        <p>Point at the NAFDAC number. I read it on your phone and never upload your photo.</p>
+      <div className="low flex flex-col gap-3">
+        {statusMessage ? (
+          <p className="text-xs font-bold text-center text-ink px-2">{statusMessage}</p>
+        ) : (
+          <p>Align the NAFDAC number inside the box and tap Scan Label.</p>
+        )}
+
+        {/* Primary Action Button: Scan Label (Active, not disabled!) */}
         <Button
-          label={isRecognized ? `Check ${detectedCode}` : isOcrReady ? "Scanning label…" : "Initializing scanner…"}
+          label={isScanning ? 'Reading label…' : 'Scan Label'}
           width="full"
-          disabled={!isRecognized}
-          onClick={() => onScanResult(detectedCode)}
+          tone="primary"
+          disabled={isScanning}
+          onClick={handleCaptureAndScan}
         />
-        <Button
-          label="Type it instead"
-          tone="ghost"
-          onClick={onTypeInstead || onClose}
-        />
+
+        {/* Secondary Actions: Upload Photo / Type Instead */}
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            label="Upload photo"
+            tone="secondary"
+            onClick={() => fileInputRef.current?.click()}
+          />
+          <Button
+            label="Type it instead"
+            tone="ghost"
+            onClick={onTypeInstead || onClose}
+          />
+        </div>
       </div>
     </div>
   );

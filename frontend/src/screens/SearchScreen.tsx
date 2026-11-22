@@ -8,7 +8,8 @@ import {
   StatusBadge,
   ChecklistItem,
   Disclaimer,
-  TabBar
+  TabBar,
+  ProductCardSkeleton,
 } from '../components';
 import { Product, ProductCategory } from '../types';
 import { repository, SearchResultItem } from '../data/repository';
@@ -31,7 +32,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
   const [query, setQuery] = useState(initialQuery);
   const [category, setCategory] = useState<string>('All');
   const [results, setResults] = useState<SearchResultItem[]>([]);
-  const [, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [syncDate, setSyncDate] = useState<string>('');
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -106,7 +107,14 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
 
       {/* Results Feed */}
       <main className="flex-1 px-4 py-2 flex flex-col gap-2">
-        {results.length > 0 ? (
+        {loading ? (
+          <div className="flex flex-col gap-2.5">
+            <ProductCardSkeleton layout="row" />
+            <ProductCardSkeleton layout="row" />
+            <ProductCardSkeleton layout="row" />
+            <ProductCardSkeleton layout="row" />
+          </div>
+        ) : results.length > 0 ? (
           <>
             {/* Header with Product Count & Clear Action */}
             <SectionHeader

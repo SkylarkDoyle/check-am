@@ -7,6 +7,7 @@ import {
   AlertBanner,
   Thumb,
   ProductCard,
+  ProductCardSkeleton,
   SectionHeader,
   Button,
   TabBar,
@@ -34,7 +35,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenAlert,
 }) => {
   const isOnline = useOnlineStatus();
-  const [activeAlert, setActiveAlert] = useState<SafetyAlert | null>(null);
+  const [alerts, setAlerts] = useState<SafetyAlert[]>([]);
   const [justChecked, setJustChecked] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [hasMore, setHasMore] = useState(true);
@@ -80,9 +81,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       setSyncDate(meta.lastSyncedShort || meta.lastSynced);
     });
 
-    // 2. Load active safety alert
-    repository.listAlerts(1).then((alerts) => {
-      if (alerts && alerts.length > 0) setActiveAlert(alerts[0]);
+    // 2. Load active safety alerts
+    repository.listAlerts(20).then((items) => {
+      setAlerts(items || []);
     });
 
     // 3. Load saved checks for "Just checked"
@@ -220,12 +221,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
         )}
 
-        {/* NAFDAC Safety Alert Banner */}
-        {activeAlert && (
+        {/* NAFDAC Safety Alert Carousel Banner - Automatically hidden if 0 alerts */}
+        {alerts.length > 0 && (
           <AlertBanner
-            headline={activeAlert.summary}
-            meta={`Issued ${activeAlert.issued_date}, nafdac.gov.ng`}
-            onClick={() => onOpenAlert(activeAlert)}
+            alerts={alerts}
+            onClickAlert={onOpenAlert}
           />
         )}
 
@@ -288,19 +288,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            {allProducts.map((prod, idx) => (
-              <ProductCard
-                key={`all-${prod.id}-${idx}`}
-                layout="tile"
-                brand={prod.brand_name || prod.product_name}
-                maker={prod.manufacturer}
-                regNumber={prod.nafdac_reg_num}
-                status={prod.status}
-                kind={prod.kind}
-                imageUrl={prod.external_image_url || undefined}
-                onClick={() => onNavigateProduct(prod)}
-              />
-            ))}
+            {allProducts.length === 0 ? (
+              <>
+                <ProductCardSkeleton layout="tile" />
+                <ProductCardSkeleton layout="tile" />
+                <ProductCardSkeleton layout="tile" />
+                <ProductCardSkeleton layout="tile" />
+              </>
+            ) : (
+              allProducts.map((prod, idx) => (
+                <ProductCard
+                  key={`all-${prod.id}-${idx}`}
+                  layout="tile"
+                  brand={prod.brand_name || prod.product_name}
+                  maker={prod.manufacturer}
+                  regNumber={prod.nafdac_reg_num}
+                  status={prod.status}
+                  kind={prod.kind}
+                  imageUrl={prod.external_image_url || undefined}
+                  onClick={() => onNavigateProduct(prod)}
+                />
+              ))
+            )}
           </div>
 
           {/* Loading More Indicator - Appears first immediately below the products grid */}

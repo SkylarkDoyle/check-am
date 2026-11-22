@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import sys
+from pathlib import Path
 
 from checkam_etl.db import get_db_connection
 from checkam_etl.images import validate_image_url
@@ -9,6 +10,7 @@ from checkam_etl.settings import settings
 from checkam_etl.sources.alerts_pdf import ingest_public_alerts
 from checkam_etl.sources.food_db import ingest_food_db
 from checkam_etl.sources.greenbook import ingest_greenbook
+from checkam_etl.sources.image_enrich import Pacing, ingest_image_enrich
 from checkam_etl.sources.napams import ingest_napams
 
 
@@ -46,7 +48,7 @@ async def main_async() -> int:
     run_parser = subparsers.add_parser("run", help="Run ingestion")
     run_parser.add_argument(
         "--source",
-        choices=["food_db", "napams", "alerts_pdf", "greenbook", "images"],
+        choices=["food_db", "napams", "alerts_pdf", "greenbook", "images", "image_enrich"],
         help="Source to run",
     )
     run_parser.add_argument("--all", action="store_true", help="Run all sources in sequence")
@@ -59,6 +61,39 @@ async def main_async() -> int:
         help="After a complete run, delete rows of that source the portal no longer lists",
     )
     run_parser.add_argument("--limit", type=int, default=None, help="Limit number of rows")
+    run_parser.add_argument(
+        "--category",
+        choices=["Food", "Beverage", "OTC"],
+        default=None,
+        help="image_enrich only: restrict to one category",
+    )
+    run_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="image_enrich only: print what would be stored, write nothing to the database",
+    )
+    run_parser.add_argument(
+        "--shuffle",
+        action="store_true",
+        help="image_enrich only: pick products at random (representative samples)",
+    )
+    run_parser.add_argument(
+        "--csv",
+        default=None,
+        help="image_enrich only: write a review sheet (with an empty 'label' column) to this path",
+    )
+    run_parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="image_enrich only: products processed at once (default 6)",
+    )
+    run_parser.add_argument(
+        "--rate",
+        type=float,
+        default=None,
+        help="image_enrich only: max searches per second across all workers (default ~1.4)",
+    )
     run_parser.add_argument(
         "--target",
         choices=["local", "neon"],
@@ -105,13 +140,24 @@ async def main_async() -> int:
             rep = await ingest_public_alerts()
         elif src == "images":
             rep = await run_images_pass()
+        elif src == "image_enrich":
+            rep = await ingest_image_enrich(
+                limit=args.limit,
+                category=args.category,
+                dry_run=args.dry_run,
+                shuffle=args.shuffle,
+                csv_path=Path(args.csv) if args.csv else None,
+                workers=args.workers,
+                pacing=Pacing(min_delay=1.0 / args.rate) if args.rate else None,
+                use_cache=not args.no_cache,
+            )
         else:
             continue
 
         rep.print_and_save()
 
         # Fail if errors or 0 parsed (except napams and images)
-        if src not in ("napams", "images") and (rep.errors or rep.parsed == 0):
+        if src not in ("napams", "images", "image_enrich") and (rep.errors or rep.parsed == 0):
             overall_exit_code = 1
         elif src != "napams" and rep.errors:
             overall_exit_code = 1

@@ -17,5 +17,6 @@ dependencies = [
     "pdfplumber",
     "tenacity",
     "beautifulsoup4",
-    "pyyaml"
+    "pyyaml",
+    "ddgs>=9.16,<10"
 ]

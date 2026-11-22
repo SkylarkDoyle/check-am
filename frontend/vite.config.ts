@@ -18,6 +18,8 @@ export default defineConfig({
         'safari-pinned-tab.svg'
       ],
       workbox: {
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api/],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'],
         runtimeCaching: [
           {

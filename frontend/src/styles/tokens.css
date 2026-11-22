@@ -17,6 +17,8 @@
   --color-alert-bg: #FFD6CF;
   --color-camera: #13200F;
   --color-on-camera: #FFFFFF;
+  --color-skeleton-bg: #DCEBD0;
+  --color-skeleton-pulse: #C5DBB6;
 
   /* Radii */
   --radius-sm: 12px;

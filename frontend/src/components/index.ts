@@ -21,3 +21,4 @@ export * from './StatusBar';
 export * from './BottomSheet';
 export * from './FoodArt';
 export * from './InstallBanner';
+export * from './Skeleton';

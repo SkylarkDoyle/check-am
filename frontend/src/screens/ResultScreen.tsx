@@ -98,36 +98,59 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
     onShowToast('Saved to this phone');
   };
 
+  const getProductShareUrl = () => {
+    return `${window.location.origin}/result/${encodeURIComponent(product.id)}`;
+  };
+
   const handleOpenWhatsApp = () => {
-    const text = encodeURIComponent(
-      `CheckAm registry check:\nProduct: ${product.product_name}\nNAFDAC no: ${product.nafdac_reg_num}\nMaker: ${product.manufacturer}\nStatus: ${
-        product.status === 'match'
-          ? 'Official NAFDAC Registry Match'
-          : product.status === 'alert'
-          ? 'Subject of Official NAFDAC Public Alert'
-          : 'Registration Lapsed / Not Found in Registry'
-      }\n\nInspect the pack yourself. CheckAm shows what the NAFDAC registry says. It does not decide whether a product is genuine.`
-    );
+    const resultUrl = getProductShareUrl();
+    const statusText =
+      product.status === 'match'
+        ? '✅ Official NAFDAC Registry Match'
+        : product.status === 'alert'
+        ? '⚠️ Subject of Official NAFDAC Public Alert'
+        : '❌ Registration Lapsed / Not Found in Registry';
+
+    const messageLines = [
+      `*CheckAm Product Verification*`,
+      ``,
+      `*Product:* ${product.product_name}`,
+      `*NAFDAC no:* ${product.nafdac_reg_num}`,
+      `*Maker:* ${product.manufacturer}`,
+      `*Status:* ${statusText}`,
+      ...(product.external_image_url ? [``, `*Pack photo:* ${product.external_image_url}`] : []),
+      ``,
+      `🔗 *View on CheckAm:* ${resultUrl}`,
+      ``,
+      `_Inspect the pack yourself. CheckAm shows what the NAFDAC registry says. It does not decide whether a product is genuine._`,
+    ];
+
+    const text = encodeURIComponent(messageLines.join('\n'));
     window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
     setShareSheetOpen(false);
   };
 
   const handleCopyShareText = () => {
-    const text = `CheckAm registry check:
-Product: ${product.product_name}
-NAFDAC no: ${product.nafdac_reg_num}
-Maker: ${product.manufacturer}
-Status: ${
+    const resultUrl = getProductShareUrl();
+    const statusText =
       product.status === 'match'
         ? 'Official NAFDAC Registry Match'
         : product.status === 'alert'
         ? 'Subject of Official NAFDAC Public Alert'
-        : 'Registration Lapsed / Not Found in Registry'
-    }
+        : 'Registration Lapsed / Not Found in Registry';
+
+    const text = `CheckAm Product Verification:
+Product: ${product.product_name}
+NAFDAC no: ${product.nafdac_reg_num}
+Maker: ${product.manufacturer}
+Status: ${statusText}
+${product.external_image_url ? `Pack photo: ${product.external_image_url}\n` : ''}
+View on CheckAm: ${resultUrl}
 
 Inspect the pack yourself. CheckAm shows what the NAFDAC registry says. It does not decide whether a product is genuine.`;
+
     navigator.clipboard.writeText(text);
-    onShowToast('Check summary copied to clipboard');
+    onShowToast('Verification summary & link copied to clipboard');
     setShareSheetOpen(false);
   };
 
@@ -327,7 +350,7 @@ Inspect the pack yourself. CheckAm shows what the NAFDAC registry says. It does 
       <BottomSheet isOpen={imagePreviewOpen} onClose={() => setImagePreviewOpen(false)} title="Image preview">
         <div className="w-full aspect-[4/3] bg-surface-alt border-thin border-line rounded-lg flex items-center justify-center overflow-hidden">
           {product.external_image_url ? (
-            <img src={product.external_image_url} alt={product.product_name} className="w-full h-full object-contain" />
+            <img src={product.external_image_url} alt={product.product_name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
           ) : (
             <div className="w-[84%] flex items-center justify-center">
               <Thumb kind={product.kind || 'tin'} size="lg" className="w-28 h-28" />
@@ -351,7 +374,7 @@ Inspect the pack yourself. CheckAm shows what the NAFDAC registry says. It does 
         </h2>
         <div className="w-full aspect-[4/3] bg-surface-alt border-thin border-line rounded-lg flex items-center justify-center overflow-hidden">
           {product.external_image_url ? (
-            <img src={product.external_image_url} alt={product.product_name} className="w-full h-full object-contain" />
+            <img src={product.external_image_url} alt={product.product_name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
           ) : (
             <div className="w-[84%] flex items-center justify-center">
               <Thumb kind={product.kind || 'tin'} size="lg" className="w-28 h-28" />
@@ -365,6 +388,16 @@ Inspect the pack yourself. CheckAm shows what the NAFDAC registry says. It does 
             <StatusBadge status={product.status} size="short" />
           </div>
         </div>
+
+        {/* Direct Link Preview Box */}
+        <div className="flex items-center gap-2 px-3 py-2 bg-surface-alt/60 border border-line rounded-md text-xs">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="flex-none text-accent">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+          </svg>
+          <span className="truncate flex-1 font-mono text-[11px] text-ink-muted">{getProductShareUrl()}</span>
+        </div>
+
         <p className="text-xs text-ink-muted leading-relaxed">
           Inspect the pack yourself. CheckAm shows what the NAFDAC registry says. It does not decide whether a product is genuine.
         </p>

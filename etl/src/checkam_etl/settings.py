@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     etl_min_delay_seconds: float = 2.0
     etl_raw_cache_dir: str = "./raw_cache"
     etl_cache_ttl_hours: float = 24.0
+    image_provider: str = "ddgs"
+    image_enrich_min_delay_seconds: float = 0.7  # gap between search starts, all workers
+    image_enrich_workers: int = 6
     greenbook_endpoint: str = ""
     alert_webhook_url: str | None = None
 

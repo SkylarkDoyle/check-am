@@ -1,0 +1,155 @@
+# Tuning for product image matching (etl/src/checkam_etl/image_match.py).
+# threshold is deliberately conservative: a wrong photo is worse than no photo.
+# Re-tune on the labelled sample (IMPLEMENTATION_IMAGE_ENRICHMENT.md section 6).
+threshold: 0.65
+# Share of the product's distinctive words that must appear in the result (all but ~1 in 5).
+min_name_fraction: 0.8
+min_short_side: 200
+good_short_side: 300
+max_aspect_ratio: 2.0
+weights:
+  name_fraction: 0.55
+  brand_token: 0.15
+  maker_token: 0.15
+  size: 0.10
+  retail_domain: 0.05
+penalties:
+  bad_aspect: 0.20
+  negative_word: 0.30
+# Candidates from these domains are never used (stock watermarks, social, video, search pages).
+blocked_domains:
+  - alamy.com
+  - shutterstock.com
+  - istockphoto.com
+  - gettyimages.com
+  - dreamstime.com
+  - depositphotos.com
+  - 123rf.com
+  - adobestock.com
+  - pinterest.com
+  - facebook.com
+  - fbsbx.com
+  - instagram.com
+  - twitter.com
+  - x.com
+  - tiktok.com
+  - youtube.com
+  - ytimg.com
+  - wikimedia.org
+  - wikipedia.org
+  - bing.com
+  - etsy.com
+  - behance.net
+  - ebay.com
+  - ebayimg.com
+  - jiji.ng
+  - jijistatic.net
+  - shopee.com
+  - susercontent.com
+  - onbuy.com
+  - aliexpress.com
+  - alibaba.com
+  - indiamart.com
+  - imimg.com
+  - alicdn.com
+  - made-in-china.com
+  - google.com
+# A title containing any of these suggests the image is not a clean product photo.
+negative_words:
+  - logo
+  - vector
+  - clipart
+  - wallpaper
+  - icon
+  - stock photo
+  - illustration
+  - recipe
+  - launches
+  - unveils
+  - review
+  - news
+  - landing page
+  - blog
+  - article
+  - gallery
+retail_hints:
+  - shop
+  - store
+  - mart
+  - pharmacy
+  - chemist
+  - supermarket
+  - market
+  - buy
+  - cdn/shop
+# Words ignored when deciding which words identify a product.
+generic_words:
+  - mg
+  - mcg
+  - g
+  - kg
+  - ml
+  - cl
+  - l
+  - iu
+  - tablet
+  - tablets
+  - capsule
+  - capsules
+  - syrup
+  - suspension
+  - cream
+  - ointment
+  - gel
+  - drops
+  - injection
+  - lozenges
+  - powder
+  - drink
+  - drinks
+  - flavoured
+  - flavored
+  - flavour
+  - flavor
+  - carbonated
+  - soft
+  - food
+  - the
+  - and
+  - with
+  - for
+  - of
+  - in
+  - pack
+  - sachet
+  - bottle
+  - tin
+  - pet
+  - dairies
+  - category
+generic_company_words:
+  - limited
+  - ltd
+  - plc
+  - nigeria
+  - nig
+  - industries
+  - company
+  - co
+  - inc
+  - pvt
+  - gmbh
+  - llc
+  - sa
+  - s
+  - a
+  - foods
+  - food
+  - pharmaceutical
+  - pharmaceuticals
+  - pharma
+  - laboratories
+  - manufacturing
+  - enterprises
+  - international
+  - group

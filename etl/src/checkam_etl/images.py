@@ -1,3 +1,4 @@
+import asyncio
 import ipaddress
 import socket
 from urllib.parse import urlparse
@@ -31,6 +32,16 @@ def is_safe_host(hostname: str) -> bool:
         return False
 
 
+_HOST_SAFETY: dict[str, bool] = {}
+
+
+async def is_safe_host_async(hostname: str) -> bool:
+    """is_safe_host without blocking the event loop (DNS runs in a thread), cached per host."""
+    if hostname not in _HOST_SAFETY:
+        _HOST_SAFETY[hostname] = await asyncio.to_thread(is_safe_host, hostname)
+    return _HOST_SAFETY[hostname]
+
+
 async def validate_image_url(url: str, client: httpx.AsyncClient | None = None) -> bool:
     """Validate external image URL according to security, SSL and size constraints."""
     if not url or len(url) > 2048:
@@ -43,7 +54,7 @@ async def validate_image_url(url: str, client: httpx.AsyncClient | None = None) 
         return False
     if not parsed.hostname:
         return False
-    if not is_safe_host(parsed.hostname):
+    if not await is_safe_host_async(parsed.hostname):
         return False
 
     close_client = False
@@ -56,7 +67,9 @@ async def validate_image_url(url: str, client: httpx.AsyncClient | None = None) 
         # Follow at most 3 redirects, validating host at each hop
         for _ in range(4):
             cur_parsed = urlparse(current_url)
-            if cur_parsed.scheme.lower() != "https" or not is_safe_host(cur_parsed.hostname or ""):
+            if cur_parsed.scheme.lower() != "https" or not await is_safe_host_async(
+                cur_parsed.hostname or ""
+            ):
                 return False
 
             try:

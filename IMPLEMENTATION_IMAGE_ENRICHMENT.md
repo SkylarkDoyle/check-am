@@ -1,6 +1,6 @@
 # CheckAm — Product Image Enrichment (ETL extension): Implementation Plan
 
-**Status:** PLAN ONLY. Nothing in this document has been built or run.
+**Status:** BUILT (steps 0, 1 and 3 done; 2 and 4 pending). Provider, scoring, migration `0006`, orchestrator, CLI and tests exist (2026-11-22). **Not yet done:** the human-labelled 150-product precision check (step 2), the full real run (step 4), the weekly re-check (step 5) and the Brave fallback (step 6). Migration `0006` is applied to the local database only, not Neon. `ddgs` 9.16.1 was verified working from this machine (20 queries, no throttling).
 **Written:** 2026-11-21
 **Goal:** for every product in `products` with an empty `external_image_url`, search the web for a photo of that product, pick one image URL, validate it, and store **only the link** in `external_image_url`.
 **Builds on:** `etl/src/checkam_etl/images.py` (URL validation), `http.py` (rate-limited client, cache), `run_report.py`, and the `ck_products_image_https` database constraint. Companion to `IMPLEMENTATION_2.1-3.5_API_AND_FRONTEND.md` (resolves its open question Q5 in favour of building this).

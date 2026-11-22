@@ -977,3 +977,24 @@
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
 }
+
+/* === Skeleton Loading === */
+@keyframes ca-skeleton-pulse {
+  0%, 100% {
+    background-color: var(--color-skeleton-bg, var(--color-surface-alt));
+    opacity: 1;
+  }
+  50% {
+    background-color: var(--color-skeleton-pulse, var(--color-line));
+    opacity: 0.52;
+  }
+}
+
+.ca-skeleton {
+  display: block;
+  background-color: var(--color-skeleton-bg, var(--color-surface-alt));
+  border-radius: var(--radius-sm);
+  animation: ca-skeleton-pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  will-change: opacity, background-color;
+}
+

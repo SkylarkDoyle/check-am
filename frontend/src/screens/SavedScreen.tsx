@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Segmented,
   ProductCard,
+  ProductCardSkeleton,
   TabBar,
   Button
 } from '../components';
@@ -21,12 +22,14 @@ export const SavedScreen: React.FC<SavedScreenProps> = ({
 }) => {
   const [filterIndex, setFilterIndex] = useState<1 | 2 | 3>(1); // 1: All, 2: Match, 3: Alert
   const [savedChecks, setSavedChecks] = useState<SavedCheck[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadSavedChecks();
   }, [filterIndex]);
 
   const loadSavedChecks = async () => {
+    setLoading(true);
     const list = await repository.listSavedChecks();
     // Re-resolve current status for each saved product
     const updatedList = await Promise.all(
@@ -52,6 +55,7 @@ export const SavedScreen: React.FC<SavedScreenProps> = ({
       filtered = updatedList.filter((i) => i.status === 'alert');
     }
     setSavedChecks(filtered);
+    setLoading(false);
   };
 
   const handleClearAll = async () => {
@@ -110,7 +114,13 @@ export const SavedScreen: React.FC<SavedScreenProps> = ({
 
       {/* Saved List */}
       <main className="flex-1 px-4 py-2 flex flex-col gap-3">
-        {savedChecks.length > 0 ? (
+        {loading ? (
+          <div className="flex flex-col gap-2.5">
+            <ProductCardSkeleton layout="row" />
+            <ProductCardSkeleton layout="row" />
+            <ProductCardSkeleton layout="row" />
+          </div>
+        ) : savedChecks.length > 0 ? (
           <div className="flex flex-col gap-2.5">
             {savedChecks.map((item) => (
               <ProductCard

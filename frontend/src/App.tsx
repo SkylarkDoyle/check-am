@@ -1,19 +1,125 @@
 import React, { useState, useEffect, useLayoutEffect } from 'react';
+import { Route, Switch, useLocation, useParams, useSearch } from 'wouter';
 import { HomeScreen } from './screens/HomeScreen';
 import { ResultScreen } from './screens/ResultScreen';
 import { SearchScreen } from './screens/SearchScreen';
 import { ScanScreen } from './screens/ScanScreen';
 import { SavedScreen } from './screens/SavedScreen';
 import { AboutScreen } from './screens/AboutScreen';
+import { ResultScreenSkeleton } from './components';
 import { Product, SafetyAlert } from './types';
 import { initDatabase } from './db';
 import { repository } from './data/repository';
 
+interface ResultRouteProps {
+  cachedProduct: Product | null;
+  onShowToast: (msg: string) => void;
+  onBack: () => void;
+}
+
+const ResultRoute: React.FC<ResultRouteProps> = ({ cachedProduct, onShowToast, onBack }) => {
+  const params = useParams<{ id: string }>();
+  const id = params.id ? decodeURIComponent(params.id) : '';
+  const [product, setProduct] = useState<Product | null>(
+    cachedProduct && (cachedProduct.id === id || cachedProduct.nafdac_reg_num === id) ? cachedProduct : null
+  );
+  const [loading, setLoading] = useState<boolean>(!product);
+  const [notFound, setNotFound] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!id) return;
+    if (cachedProduct && (cachedProduct.id === id || cachedProduct.nafdac_reg_num === id)) {
+      setProduct(cachedProduct);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setNotFound(false);
+
+    repository.getProduct(id).then(async (prod) => {
+      if (prod) {
+        setProduct(prod);
+        setLoading(false);
+      } else {
+        const lookup = await repository.lookupReg(id);
+        if (lookup.result === 'match' && lookup.products.length > 0) {
+          setProduct(lookup.products[0]);
+          setLoading(false);
+        } else {
+          setNotFound(true);
+          setLoading(false);
+        }
+      }
+    }).catch(() => {
+      setNotFound(true);
+      setLoading(false);
+    });
+  }, [id, cachedProduct]);
+
+  if (loading) {
+    return <ResultScreenSkeleton />;
+  }
+
+  if (notFound || !product) {
+    return (
+      <div className="min-h-screen bg-ground flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-surface-alt flex items-center justify-center text-ink/40 mb-4">
+          <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+        </div>
+        <h2 className="font-heading font-black text-ink text-xl mb-2">Product Not Found</h2>
+        <p className="font-body text-ink/70 text-sm max-w-xs mb-6">
+          We couldn't find a product matching this verification ID or registration number in the registry.
+        </p>
+        <button
+          type="button"
+          onClick={onBack}
+          className="bg-primary text-ground px-6 py-2.5 rounded-pill font-body font-bold text-sm shadow-sm active:opacity-90"
+        >
+          Return Home
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <ResultScreen
+      product={product}
+      onBack={onBack}
+      onShowToast={onShowToast}
+    />
+  );
+};
+
+const SearchRoute: React.FC<{
+  onSelectProduct: (product: Product) => void;
+  onOpenScan: () => void;
+  onNavigateTab: (tab: 'home' | 'scan' | 'saved' | 'about') => void;
+  onBack: () => void;
+}> = ({ onSelectProduct, onOpenScan, onNavigateTab, onBack }) => {
+  const searchString = useSearch();
+  const searchParams = new URLSearchParams(searchString);
+  const initialQuery = searchParams.get('q') || '';
+
+  return (
+    <SearchScreen
+      key={initialQuery}
+      initialQuery={initialQuery}
+      onSelectProduct={onSelectProduct}
+      onBack={onBack}
+      onOpenScan={onOpenScan}
+      onNavigateTab={onNavigateTab}
+    />
+  );
+};
+
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'home' | 'scan' | 'saved' | 'about'>('home');
-  const [currentScreen, setCurrentScreen] = useState<'home' | 'result' | 'search' | 'scan' | 'saved' | 'about'>('home');
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [searchInitialQuery, setSearchInitialQuery] = useState<string>('');
+  const [location, setLocation] = useLocation();
+  const [cachedProduct, setCachedProduct] = useState<Product | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -21,14 +127,31 @@ export const App: React.FC = () => {
     if ('scrollRestoration' in window.history) {
       window.history.scrollRestoration = 'manual';
     }
-  }, []);
+
+    // Direct deep-link backwards compatibility for legacy query parameters (?product=<id> or ?reg=<reg>)
+    const params = new URLSearchParams(window.location.search);
+    const prodId = params.get('product') || params.get('id');
+    const reg = params.get('reg');
+
+    if (prodId) {
+      setLocation(`/result/${encodeURIComponent(prodId)}`, { replace: true });
+    } else if (reg) {
+      repository.lookupReg(reg).then((lookup) => {
+        if (lookup.result === 'match' && lookup.products.length > 0) {
+          setLocation(`/result/${encodeURIComponent(lookup.products[0].id)}`, { replace: true });
+        } else {
+          setLocation(`/search?q=${encodeURIComponent(reg)}`, { replace: true });
+        }
+      });
+    }
+  }, [setLocation]);
 
   // Always reset scroll to top on screen transitions
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
-  }, [currentScreen]);
+  }, [location]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -38,44 +161,49 @@ export const App: React.FC = () => {
   };
 
   const handleNavigateTab = (tab: 'home' | 'scan' | 'saved' | 'about') => {
-    setActiveTab(tab);
     if (tab === 'home') {
-      setCurrentScreen('home');
+      setLocation('/');
     } else if (tab === 'scan') {
-      setCurrentScreen('scan');
+      setLocation('/scan');
     } else if (tab === 'saved') {
-      setCurrentScreen('saved');
+      setLocation('/saved');
     } else if (tab === 'about') {
-      setCurrentScreen('about');
+      setLocation('/about');
     }
   };
 
   const handleOpenSearch = (initialQuery = '') => {
-    setSearchInitialQuery(initialQuery);
-    setCurrentScreen('search');
+    if (initialQuery) {
+      setLocation(`/search?q=${encodeURIComponent(initialQuery)}`);
+    } else {
+      setLocation('/search');
+    }
   };
 
-  const handleSelectProduct = (product: Product) => {
-    setSelectedProduct(product);
-    setCurrentScreen('result');
+  const navigateToProductResult = (product: Product) => {
+    setCachedProduct(product);
+    setLocation(`/result/${encodeURIComponent(product.id)}`);
+  };
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      setLocation('/');
+    }
   };
 
   const handleScanResult = async (detectedCode: string) => {
     const lookup = await repository.lookupReg(detectedCode);
 
     if (lookup.result === 'match' && lookup.products.length > 0) {
-      setSelectedProduct(lookup.products[0]);
-      setCurrentScreen('result');
+      navigateToProductResult(lookup.products[0]);
       showToast(`Verified ${lookup.products[0].nafdac_reg_num}`);
     } else if (lookup.result === 'multiple') {
-      // Multiple products share this registration number -> navigate to Search results list
-      setSearchInitialQuery(detectedCode);
-      setCurrentScreen('search');
+      setLocation(`/search?q=${encodeURIComponent(detectedCode)}`);
       showToast(`${lookup.products.length} records found for ${detectedCode}`);
     } else {
-      // Unrecognized / Not Found -> open SearchScreen with the detected code to show "No match found" view
-      setSearchInitialQuery(detectedCode);
-      setCurrentScreen('search');
+      setLocation(`/search?q=${encodeURIComponent(detectedCode)}`);
       showToast(`No record found for ${detectedCode}`);
     }
   };
@@ -84,14 +212,13 @@ export const App: React.FC = () => {
     if (alert.nafdac_reg_num) {
       const prod = await repository.getProduct(alert.nafdac_reg_num);
       if (prod) {
-        setSelectedProduct(prod);
-        setCurrentScreen('result');
+        navigateToProductResult(prod);
         return;
       }
     }
 
     // Direct alert object view
-    setSelectedProduct({
+    navigateToProductResult({
       id: alert.id,
       nafdac_reg_num: alert.nafdac_reg_num || 'Alert Notice',
       normalized_reg_num: alert.nafdac_reg_num ? alert.nafdac_reg_num.replace(/[^A-Za-z0-9]/g, '').toUpperCase() : '',
@@ -105,7 +232,6 @@ export const App: React.FC = () => {
       alert_title: alert.title || alert.product_name,
       alert_meta: `Issued ${alert.issued_date}, nafdac.gov.ng`,
     });
-    setCurrentScreen('result');
   };
 
   return (
@@ -129,65 +255,68 @@ export const App: React.FC = () => {
       )}
 
       {/* Screen Router */}
-      {currentScreen === 'home' && (
-        <HomeScreen
-          onNavigateProduct={handleSelectProduct}
-          onOpenScan={() => setCurrentScreen('scan')}
-          onOpenSearch={handleOpenSearch}
-          onNavigateTab={handleNavigateTab}
-          onOpenAlert={handleOpenAlert}
-        />
-      )}
+      <Switch>
+        <Route path="/">
+          <HomeScreen
+            onNavigateProduct={navigateToProductResult}
+            onOpenScan={() => setLocation('/scan')}
+            onOpenSearch={handleOpenSearch}
+            onNavigateTab={handleNavigateTab}
+            onOpenAlert={handleOpenAlert}
+          />
+        </Route>
 
-      {currentScreen === 'search' && (
-        <SearchScreen
-          initialQuery={searchInitialQuery}
-          onSelectProduct={handleSelectProduct}
-          onBack={() => handleNavigateTab('home')}
-          onOpenScan={() => setCurrentScreen('scan')}
-          onNavigateTab={handleNavigateTab}
-        />
-      )}
+        <Route path="/saved">
+          <SavedScreen
+            onNavigateProduct={navigateToProductResult}
+            onNavigateTab={handleNavigateTab}
+            onShowToast={showToast}
+          />
+        </Route>
 
-      {currentScreen === 'scan' && (
-        <ScanScreen
-          onScanResult={handleScanResult}
-          onClose={() => handleNavigateTab('home')}
-          onTypeInstead={() => {
-            setSearchInitialQuery('');
-            setCurrentScreen('search');
-          }}
-        />
-      )}
+        <Route path="/about">
+          <AboutScreen
+            onNavigateTab={handleNavigateTab}
+            onShowToast={showToast}
+          />
+        </Route>
 
-      {currentScreen === 'result' && selectedProduct && (
-        <ResultScreen
-          product={selectedProduct}
-          onBack={() => {
-            if (activeTab === 'saved') {
-              setCurrentScreen('saved');
-            } else {
-              handleNavigateTab('home');
-            }
-          }}
-          onShowToast={showToast}
-        />
-      )}
+        <Route path="/scan">
+          <ScanScreen
+            onScanResult={handleScanResult}
+            onClose={handleBack}
+            onTypeInstead={() => setLocation('/search')}
+          />
+        </Route>
 
-      {currentScreen === 'saved' && (
-        <SavedScreen
-          onNavigateProduct={handleSelectProduct}
-          onNavigateTab={handleNavigateTab}
-          onShowToast={showToast}
-        />
-      )}
+        <Route path="/search">
+          <SearchRoute
+            onSelectProduct={navigateToProductResult}
+            onOpenScan={() => setLocation('/scan')}
+            onNavigateTab={handleNavigateTab}
+            onBack={handleBack}
+          />
+        </Route>
 
-      {currentScreen === 'about' && (
-        <AboutScreen
-          onNavigateTab={handleNavigateTab}
-          onShowToast={showToast}
-        />
-      )}
+        <Route path="/result/:id">
+          <ResultRoute
+            cachedProduct={cachedProduct}
+            onBack={handleBack}
+            onShowToast={showToast}
+          />
+        </Route>
+
+        {/* Fallback route */}
+        <Route>
+          <HomeScreen
+            onNavigateProduct={navigateToProductResult}
+            onOpenScan={() => setLocation('/scan')}
+            onOpenSearch={handleOpenSearch}
+            onNavigateTab={handleNavigateTab}
+            onOpenAlert={handleOpenAlert}
+          />
+        </Route>
+      </Switch>
     </div>
   );
 };

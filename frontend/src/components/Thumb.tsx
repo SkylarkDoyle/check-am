@@ -40,6 +40,7 @@ export const Thumb: React.FC<ThumbProps> = ({
           className="w-full h-full object-cover"
           onError={() => setImgError(true)}
           loading="lazy"
+          referrerPolicy="no-referrer"
         />
       ) : (
         <>

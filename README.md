@@ -186,6 +186,14 @@ python -m checkam_etl.cli run --source alerts_pdf
 
 Useful flags: `--limit N`, `--no-cache`, `--prune`, and `--target neon` (writes to `NEON_DIRECT_URL` instead of the local database).
 
+**Product photos (optional).** `image_enrich` searches the web for a photo of each product and stores only the link, with the page it came from and a match score. It keeps a photo only when the match is strong, so many products stay without one. Always review a dry run first:
+
+```bash
+python -m checkam_etl.cli run --source image_enrich --dry-run --shuffle --limit 100 --csv ../docs/review.csv
+```
+
+It needs migration `0006` and is paced politely (about one search every 2.5 seconds). Photos belong to their original sites, so show the source and describe them as not from NAFDAC.
+
 **3. API**
 
 ```bash

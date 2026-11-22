@@ -3,11 +3,15 @@ import { Thumb } from './Thumb';
 import { RegNumber } from './RegNumber';
 import { StatusBadge } from './StatusBadge';
 import { ProductStatus } from '../types';
+import { ProductCardSkeleton } from './Skeleton';
+
+export { ProductCardSkeleton };
 
 export interface ProductCardProps {
+  loading?: boolean;
   layout?: 'row' | 'tile';
-  brand: string;
-  maker: string;
+  brand?: string;
+  maker?: string;
   regNumber?: string;
   status?: ProductStatus;
   kind?: 'tin' | 'bottle' | 'sachet' | 'tube';
@@ -20,9 +24,10 @@ export interface ProductCardProps {
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
+  loading = false,
   layout = 'row',
-  brand,
-  maker,
+  brand = '',
+  maker = '',
   regNumber,
   status = 'match',
   kind = 'tin',
@@ -33,6 +38,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onClick,
   className = '',
 }) => {
+  if (loading) {
+    return <ProductCardSkeleton layout={layout} className={className} />;
+  }
   return (
     <div
       className={`ca-card ${className}`}
