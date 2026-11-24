@@ -112,3 +112,8 @@ Goal: stop the "still not working" cases without leaving the device. Root cause 
 ## Out of scope
 - Backend, ETL, database, WhatsApp bot, PaddleOCR (only the seam for it), social posts (design only).
 - No git add, commit or push as part of this work.
+
+## Update: shutter scanner (replaces the live loop)
+The live scanning loop was removed. The scan flow is now: take a photo (shutter), drag a box over the NAFDAC number, tap Read number, then confirm in an editable sheet with "Did you mean" chips. No auto-continue. Without a live camera, the phone's own camera app opens and its photo goes to the same box step.
+Doop frames: `Scan / Camera (shutter)`, `Scan / Adjust box`, `Scan / Reading`, `Scan / Got it sheet`.
+Code: `hooks/useScanner.ts` (phases camera, adjust, reading, result), `components/scan/CropBoxEditor.tsx`, `components/scan/ScanBubble.tsx` (now the sheet), `screens/ScanScreen.tsx`, `RegistryIndex.closest` in `lib/ocr/registry.ts`.

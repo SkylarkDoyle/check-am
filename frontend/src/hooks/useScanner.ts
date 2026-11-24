@@ -9,33 +9,39 @@ import {
   RegistryIndex,
   ScanConfirmer,
   ScanDiagnostics,
-  ScanSession,
   SuggestReason,
   TesseractEngine,
-  computeCropRect,
-  decisionToOutcome,
-  isBlurry,
   logScan,
   readLiveCrop,
-  readPhoto,
   toRecognizeFn,
 } from '../lib/ocr';
 
-const TICK_MS = 700;
-const HINT_CLOSER_MS = 8000;
-const HINT_GIVE_UP_MS = 20000;
-const MAX_CROP_WIDTH = 1600;
-/** The crop covers the aiming box plus this much margin on every side. */
-const CROP_PAD = 0.35;
-/** After this many blurry frames in a row, read anyway so a phone that never gets sharp still tries. */
-const MAX_BLURRY_IN_A_ROW = 5;
+/** The still is capped at this width: sharp enough for small print, light enough to read quickly. */
+const MAX_STILL_WIDTH = 2400;
+/** Extra margin around the dragged box when reading, as a share of the box size. */
+const READ_PAD = 0.12;
 
 export type CameraState = 'pending' | 'ready' | 'denied' | 'unsupported';
+/**
+ * camera: live preview and shutter. adjust: the photo with a draggable box. reading: OCR running.
+ * result: the editable "Got it!" sheet.
+ */
+export type ScanPhase = 'camera' | 'adjust' | 'reading' | 'result';
 
 export interface Suggestion {
   code: string;
   reason: SuggestReason;
 }
+
+/** The read area, as shares (0 to 1) of the photo's width and height. */
+export interface CropBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export const DEFAULT_BOX: CropBox = { x: 0.08, y: 0.4, w: 0.84, h: 0.16 };
 
 export interface UseScannerOptions {
   onScanResult: (code: string) => void;
@@ -53,31 +59,31 @@ async function loadRegistryIndex(): Promise<RegistryIndex | null> {
   }
 }
 
-/** Camera, reader, scan loop and result events. The screen only presents what this returns. */
+/**
+ * Take a photo, drag a box over the number, read it, confirm. There is no live scanning loop:
+ * one sharp still read once is faster and more accurate than reading blurry video frames.
+ * The screen only presents what this returns.
+ */
 export function useScanner({ onScanResult, createEngine }: UseScannerOptions) {
   const [camera, setCamera] = useState<CameraState>('pending');
   const [engineState, setEngineState] = useState<ScanDiagnostics['engine']>('idle');
+  const [phase, setPhase] = useState<ScanPhase>('camera');
   const [statusMessage, setStatusMessage] = useState('');
-  const [autoCode, setAutoCode] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [totalCount, setTotalCount] = useState<number | undefined>(undefined);
   const [torch, setTorch] = useState({ supported: false, on: false });
-  /** Real (optical or sensor) zoom, only where the camera reports it. Digital zoom would just blur. */
-  const [zoom, setZoom] = useState<{ supported: boolean; min: number; max: number; step: number; value: number }>({
-    supported: false, min: 1, max: 1, step: 0.1, value: 1,
-  });
-  const [isReadingPhoto, setIsReadingPhoto] = useState(false);
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [stillUrl, setStillUrl] = useState<string | null>(null);
+  const [box, setBox] = useState<CropBox>(DEFAULT_BOX);
   const [diagnostics, setDiagnostics] = useState<ScanDiagnostics>(EMPTY_DIAGNOSTICS);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const guideRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const engineRef = useRef<OcrEngine | null>(null);
   const engineGen = useRef(0);
   const indexRef = useRef<RegistryIndex | null>(null);
   const confirmerRef = useRef<ScanConfirmer>(new ScanConfirmer(null));
-  const frameCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const stillRef = useRef<HTMLCanvasElement | null>(null);
+  const stillUrlRef = useRef<string | null>(null);
   const doneRef = useRef(false);
   const diagRef = useRef<ScanDiagnostics>(EMPTY_DIAGNOSTICS);
   const onResultRef = useRef(onScanResult);
@@ -138,21 +144,14 @@ export function useScanner({ onScanResult, createEngine }: UseScannerOptions) {
         return;
       }
       streamRef.current = stream;
-
       const track = stream.getVideoTracks()[0];
       const caps = (track?.getCapabilities?.() ?? {}) as Record<string, unknown>;
       if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
         track.applyConstraints({ advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet] }).catch(() => {});
       }
       setTorch({ supported: Boolean(caps.torch), on: false });
-      const z = caps.zoom as { min: number; max: number; step?: number } | undefined;
-      if (z && z.max > z.min) {
-        const cur = Number((track.getSettings?.() as { zoom?: number })?.zoom ?? z.min);
-        setZoom({ supported: true, min: z.min, max: z.max, step: z.step || 0.1, value: cur });
-      }
       const settings = track?.getSettings?.() ?? {};
       if (settings.width && settings.height) patchDiag({ camera: { width: settings.width, height: settings.height } });
-
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play().catch(() => {});
@@ -163,18 +162,6 @@ export function useScanner({ onScanResult, createEngine }: UseScannerOptions) {
       setCamera('denied');
     }
   }, [patchDiag]);
-
-  const changeZoom = useCallback(async (dir: 1 | -1) => {
-    const track = streamRef.current?.getVideoTracks()[0];
-    if (!track) return;
-    setZoom((prev) => {
-      if (!prev.supported) return prev;
-      const span = prev.max - prev.min;
-      const next = Math.min(prev.max, Math.max(prev.min, prev.value + dir * Math.max(prev.step, span / 6)));
-      track.applyConstraints({ advanced: [{ zoom: next } as MediaTrackConstraintSet] }).catch(() => {});
-      return { ...prev, value: next };
-    });
-  }, []);
 
   const toggleTorch = useCallback(async () => {
     const track = streamRef.current?.getVideoTracks()[0];
@@ -205,209 +192,48 @@ export function useScanner({ onScanResult, createEngine }: UseScannerOptions) {
       stopCamera();
       engineRef.current?.dispose();
       engineRef.current = null;
+      if (stillUrlRef.current) URL.revokeObjectURL(stillUrlRef.current);
+      stillUrlRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---- results ------------------------------------------------------------------------------
-  const finishAuto = useCallback((code: string) => {
-    if (doneRef.current) return;
-    doneRef.current = true;
-    setAutoCode(code);
-    setStatusMessage(`Detected ${code}`);
-    haptic('scanHit');
-    // Let the "Got it!" bubble be seen before moving on.
-    setTimeout(() => onResultRef.current(code), 800);
-  }, []);
-
-  const offerSuggestion = useCallback((s: Suggestion) => {
-    setSuggestion(s);
-    setStatusMessage('');
-    haptic('scanHit');
-  }, []);
-
-  /** The user tapped Check. A normal registry lookup runs; the typed text is never altered. */
-  const confirmSuggestion = useCallback((code: string) => {
-    const clean = code.trim();
-    if (!clean || doneRef.current) return;
-    doneRef.current = true;
-    onResultRef.current(clean);
-  }, []);
-
-  /** Throw the suggestion away and keep scanning. */
-  const dismissSuggestion = useCallback(() => {
-    confirmerRef.current.reset();
-    setSuggestion(null);
-    setStatusMessage('');
-  }, []);
-
-  // ---- the hands-free loop ------------------------------------------------------------------
-  const grabAimedCrop = useCallback((): Pixels | null => {
-    const video = videoRef.current;
-    const guide = guideRef.current;
-    if (!video || !guide || video.readyState < 2 || !video.videoWidth) return null;
-    const v = video.getBoundingClientRect();
-    const g = guide.getBoundingClientRect();
-    const rect = computeCropRect(
-      { w: video.videoWidth, h: video.videoHeight },
-      { w: v.width, h: v.height },
-      { x: g.left - v.left, y: g.top - v.top, w: g.width, h: g.height },
-      CROP_PAD
-    );
-    const scale = Math.min(1, MAX_CROP_WIDTH / rect.w);
-    const w = Math.max(1, Math.round(rect.w * scale));
-    const h = Math.max(1, Math.round(rect.h * scale));
-    const canvas = frameCanvasRef.current ?? (frameCanvasRef.current = document.createElement('canvas'));
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return null;
-    ctx.drawImage(video, rect.x, rect.y, rect.w, rect.h, 0, 0, w, h);
-    const img = ctx.getImageData(0, 0, w, h);
-    const cam = diagRef.current.camera;
-    if (!cam || cam.width !== video.videoWidth || cam.height !== video.videoHeight) {
-      patchDiag({ camera: { width: video.videoWidth, height: video.videoHeight } });
-    }
-    return { width: w, height: h, data: img.data };
-  }, [patchDiag]);
-
-  const paused = autoCode !== null || suggestion !== null || isReadingPhoto;
-
-  useEffect(() => {
-    if (camera !== 'ready' || engineState !== 'ready' || paused) return;
-    const engine = engineRef.current;
-    if (!engine) return;
-    const recognize = toRecognizeFn(engine);
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let blurryRun = 0;
-    const startedAt = Date.now();
-    setStatusMessage('');
-
-    const tick = async () => {
-      if (cancelled || doneRef.current) return;
-      if (!document.hidden) {
-        try {
-          const crop = grabAimedCrop();
-          if (crop && isBlurry(crop) && blurryRun < MAX_BLURRY_IN_A_ROW) {
-            blurryRun++;
-            patchDiag({ skippedBlurry: diagRef.current.skippedBlurry + 1 });
-          } else if (crop) {
-            blurryRun = 0;
-            const t0 = performance.now();
-            const { text, enhanced } = await readLiveCrop(crop, recognize);
-            const ms = performance.now() - t0;
-            if (cancelled) return;
-            const step = confirmerRef.current.ingest(text);
-            patchDiag({
-              frame: { width: crop.width, height: crop.height },
-              lastText: text,
-              candidates: step.candidates,
-              matched: step.matched,
-              lastReadMs: ms,
-              reads: diagRef.current.reads + 1,
-              usedEnhanced: enhanced,
-            });
-            logScan('read', diagRef.current);
-            if (step.outcome.action === 'auto') {
-              finishAuto(step.outcome.code);
-              return;
-            }
-            if (step.outcome.action === 'suggest') {
-              offerSuggestion({ code: step.outcome.code, reason: step.outcome.reason });
-              return;
-            }
-          }
-        } catch (err) {
-          console.warn('Scan frame failed', err);
-        }
-        const waited = Date.now() - startedAt;
-        if (waited > HINT_GIVE_UP_MS) {
-          const guess = confirmerRef.current.bestGuess();
-          if (guess.action === 'suggest') {
-            offerSuggestion({ code: guess.code, reason: guess.reason });
-            return;
-          }
-          setStatusMessage('Still nothing. Try more light, or type the number instead.');
-        } else if (waited > HINT_CLOSER_MS) {
-          setStatusMessage('Move closer so the number fills the box, and hold steady.');
-        }
-      }
-      if (!cancelled && !doneRef.current) timer = setTimeout(tick, TICK_MS);
-    };
-    tick();
-
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
-  }, [camera, engineState, paused, grabAimedCrop, patchDiag, finishAuto, offerSuggestion]);
-
-  // ---- one sharp still photo: taken from the live camera, or from the phone's own camera app --
-  const readBlob = useCallback(
+  // ---- the photo ----------------------------------------------------------------------------
+  /** Put a photo (from the live camera or the phone's camera app) on screen, ready to adjust. */
+  const loadStill = useCallback(
     async (blob: Blob) => {
-      if (doneRef.current) return;
-      const previewUrl = URL.createObjectURL(blob);
-      setCapturedImage((old) => {
-        if (old) URL.revokeObjectURL(old);
-        return previewUrl;
-      });
-      confirmerRef.current.reset();
-      setIsReadingPhoto(true);
-      setSuggestion(null);
-      setStatusMessage('Reading the photo…');
       try {
-        if (engineRef.current === null || engineState !== 'ready') await startEngine();
-        const engine = engineRef.current;
-        if (!engine) throw new Error('no engine');
         const bitmap = await createImageBitmap(blob);
-        const scale = Math.min(1, 2000 / bitmap.width);
+        const scale = Math.min(1, MAX_STILL_WIDTH / bitmap.width);
         const canvas = document.createElement('canvas');
         canvas.width = Math.round(bitmap.width * scale);
         canvas.height = Math.round(bitmap.height * scale);
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        if (!ctx) throw new Error('no canvas');
-        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        canvas.getContext('2d', { willReadFrequently: true })?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
         bitmap.close?.();
-        const full: Pixels = {
-          width: canvas.width,
-          height: canvas.height,
-          data: ctx.getImageData(0, 0, canvas.width, canvas.height).data,
-        };
-        // A still photo cannot be re-read like live frames, so different passes over the same
-        // picture have to agree (the same two-reads rule as the camera).
-        const decision = await readPhoto(full, toRecognizeFn(engine), new ScanSession(indexRef.current));
-        if (decision) {
-          const outcome = decisionToOutcome(decision);
-          if (outcome.action === 'auto') finishAuto(outcome.code);
-          else if (outcome.action === 'suggest') offerSuggestion({ code: outcome.code, reason: outcome.reason });
-          return;
-        }
-        // Nothing certain: still hand the person the bubble with the best guess (or an empty box)
-        // so they can type or pick a suggestion instead of starting over.
-        const guess = confirmerRef.current.bestGuess();
-        if (guess.action === 'suggest') {
-          offerSuggestion({ code: guess.code, reason: guess.reason });
-        } else {
-          setStatusMessage('Could not find a NAFDAC number in that photo. Try a closer, sharper one, or type it.');
-        }
+        stillRef.current = canvas;
+        const url = await new Promise<string>((resolve, reject) =>
+          canvas.toBlob((b) => (b ? resolve(URL.createObjectURL(b)) : reject(new Error('encode'))), 'image/jpeg', 0.92)
+        );
+        if (stillUrlRef.current) URL.revokeObjectURL(stillUrlRef.current);
+        stillUrlRef.current = url;
+        setStillUrl(url);
+        patchDiag({ frame: { width: canvas.width, height: canvas.height } });
+        setBox(DEFAULT_BOX);
+        setSuggestion(null);
+        setStatusMessage('');
+        setPhase('adjust');
       } catch (err) {
-        console.warn('Photo read failed', err);
-        setStatusMessage('Could not read that photo. Please type the number instead.');
-      } finally {
-        setIsReadingPhoto(false);
+        console.warn('Could not open the photo', err);
+        setStatusMessage('Could not open that photo. Try again, or type the number.');
       }
     },
-    [engineState, startEngine, finishAuto, offerSuggestion]
+    [patchDiag]
   );
 
-  /** A file from the phone's own camera app (or the gallery). Read straight away, no extra step. */
-  const readPhotoFile = useCallback((file: File) => readBlob(file), [readBlob]);
-
   /**
-   * Take a still from the live camera and read it. Uses the camera's full-resolution, autofocused
-   * photo where the browser supports it (much sharper than a video frame), else the full video frame.
-   * Returns false when there is no live camera, so the screen can open the phone's camera app.
+   * Take a still from the live camera: the camera's full-resolution, autofocused photo where the
+   * browser supports it, else the full video frame. False when there is no live camera, so the
+   * screen can open the phone's own camera app instead.
    */
   const takePhoto = useCallback(async (): Promise<boolean> => {
     const video = videoRef.current;
@@ -415,10 +241,11 @@ export function useScanner({ onScanResult, createEngine }: UseScannerOptions) {
     if (camera !== 'ready' || !video || !track) return false;
     haptic('scanHit');
     try {
-      const IC = (window as unknown as { ImageCapture?: new (t: MediaStreamTrack) => { takePhoto(): Promise<Blob> } }).ImageCapture;
+      const IC = (
+        window as unknown as { ImageCapture?: new (t: MediaStreamTrack) => { takePhoto(): Promise<Blob> } }
+      ).ImageCapture;
       if (IC) {
-        const blob = await new IC(track).takePhoto();
-        await readBlob(blob);
+        await loadStill(await new IC(track).takePhoto());
         return true;
       }
     } catch (err) {
@@ -431,32 +258,111 @@ export function useScanner({ onScanResult, createEngine }: UseScannerOptions) {
     canvas.getContext('2d')?.drawImage(video, 0, 0);
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
     if (!blob) return false;
-    await readBlob(blob);
+    await loadStill(blob);
     return true;
-  }, [camera, readBlob]);
+  }, [camera, loadStill]);
+
+  /** A file from the phone's own camera app or gallery. It goes to the same adjust step. */
+  const loadPhotoFile = useCallback((file: File) => loadStill(file), [loadStill]);
+
+  const retake = useCallback(() => {
+    setSuggestion(null);
+    setStatusMessage('');
+    setPhase('camera');
+    // Make sure the live picture is playing again (some browsers pause a hidden video).
+    const video = videoRef.current;
+    if (video && streamRef.current) {
+      if (video.srcObject !== streamRef.current) video.srcObject = streamRef.current;
+      video.play().catch(() => {});
+    }
+  }, []);
+
+  // ---- read the boxed area ------------------------------------------------------------------
+  const readBox = useCallback(async () => {
+    const canvas = stillRef.current;
+    if (!canvas || doneRef.current) return;
+    setPhase('reading');
+    setStatusMessage('');
+    try {
+      if (!engineRef.current || engineState !== 'ready') await startEngine();
+      const engine = engineRef.current;
+      if (!engine) throw new Error('no engine');
+
+      // The dragged box plus a little margin, cut from the full-resolution photo.
+      const padX = box.w * READ_PAD;
+      const padY = box.h * READ_PAD;
+      const x0 = Math.max(0, box.x - padX);
+      const y0 = Math.max(0, box.y - padY);
+      const x1 = Math.min(1, box.x + box.w + padX);
+      const y1 = Math.min(1, box.y + box.h + padY);
+      const sx = Math.round(x0 * canvas.width);
+      const sy = Math.round(y0 * canvas.height);
+      const sw = Math.max(8, Math.round((x1 - x0) * canvas.width));
+      const sh = Math.max(8, Math.round((y1 - y0) * canvas.height));
+      const data = canvas.getContext('2d', { willReadFrequently: true })?.getImageData(sx, sy, sw, sh);
+      if (!data) throw new Error('no pixels');
+      const crop: Pixels = { width: sw, height: sh, data: data.data };
+
+      const t0 = performance.now();
+      const { text, enhanced } = await readLiveCrop(crop, toRecognizeFn(engine));
+      const ms = performance.now() - t0;
+      confirmerRef.current.reset();
+      const step = confirmerRef.current.ingest(text);
+      patchDiag({
+        frame: { width: sw, height: sh },
+        lastText: text,
+        candidates: step.candidates,
+        matched: step.matched,
+        lastReadMs: ms,
+        reads: diagRef.current.reads + 1,
+        usedEnhanced: enhanced,
+      });
+      logScan('read', diagRef.current);
+
+      if (step.matched) {
+        setSuggestion({ code: step.matched, reason: 'registry-match' });
+      } else if (step.candidates.length > 0) {
+        setSuggestion({ code: step.candidates[0], reason: 'single-read' });
+      } else {
+        setSuggestion({ code: '', reason: 'nothing-read' });
+      }
+      haptic('scanHit');
+      setPhase('result');
+    } catch (err) {
+      console.warn('Reading the photo failed', err);
+      setStatusMessage('Could not read that photo. Move the box or retake it, or type the number.');
+      setPhase('adjust');
+    }
+  }, [box, engineState, startEngine, patchDiag]);
+
+  /** The user tapped Check. A normal registry lookup runs; the typed text is never altered. */
+  const confirmSuggestion = useCallback((code: string) => {
+    const clean = code.trim();
+    if (!clean || doneRef.current) return;
+    doneRef.current = true;
+    onResultRef.current(clean);
+  }, []);
 
   return {
     videoRef,
-    guideRef,
     camera,
     engineState,
+    phase,
     statusMessage,
-    autoCode,
     suggestion,
     totalCount,
     torch,
-    zoom,
-    changeZoom,
-    isReadingPhoto,
-    capturedImage,
+    stillUrl,
+    box,
+    setBox,
     diagnostics,
-    scanning: camera === 'ready' && engineState === 'ready' && !paused,
     toggleTorch,
     retryEngine: startEngine,
     findClose: (code: string) => indexRef.current?.closest(code, 3) ?? [],
-    confirmSuggestion,
-    dismissSuggestion,
-    readPhotoFile,
     takePhoto,
+    loadPhotoFile,
+    retake,
+    readBox,
+    confirmSuggestion,
   };
 }

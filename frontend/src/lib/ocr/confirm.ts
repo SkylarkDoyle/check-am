@@ -8,7 +8,7 @@ import { ScanDecision, ScanSession } from './session';
  *  - repaired:        one look-alike character away from exactly one registered number.
  *  - single-read:     seen once (or never repeated); the best guess so far.
  */
-export type SuggestReason = 'not-in-registry' | 'repaired' | 'single-read';
+export type SuggestReason = 'not-in-registry' | 'repaired' | 'single-read' | 'registry-match' | 'nothing-read';
 
 export type ConfirmOutcome =
   /** Exact registry match seen twice: continue to the result without a tap. */
