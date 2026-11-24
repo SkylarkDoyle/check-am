@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  FoodArt,
   Logo,
   SearchBar,
   OfflinePill,
@@ -16,11 +15,13 @@ import {
 import { Product, SafetyAlert } from '../types';
 import { repository } from '../data/repository';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { useAiLookup } from '../hooks/useAiLookup';
+import { AiSearchButton } from '../components/ai';
 
 interface HomeScreenProps {
   onNavigateProduct: (product: Product) => void;
   onOpenScan: () => void;
-  onOpenSearch: (initialQuery?: string) => void;
+  onOpenSearch: (initialQuery?: string, opts?: { askAi?: boolean; category?: string }) => void;
   onNavigateTab: (tab: 'home' | 'scan' | 'saved' | 'about') => void;
   onOpenAlert: (alert: SafetyAlert) => void;
 }
@@ -66,6 +67,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenAlert,
 }) => {
   const isOnline = useOnlineStatus();
+  const ai = useAiLookup();
+  const { refreshUsage } = ai;
+  useEffect(() => {
+    if (isOnline) refreshUsage();
+  }, [isOnline, refreshUsage]);
   const [alerts, setAlerts] = useState<SafetyAlert[]>([]);
   const [justChecked, setJustChecked] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -179,7 +185,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [hasMore, isLoadingMore, allProducts.length, totalCount]);
 
   const handleCategoryClick = (categoryName: string) => {
-    onOpenSearch(categoryName);
+    // Opens Search on that category tab; nothing is typed into the search bar.
+    onOpenSearch('', { category: categoryName });
   };
 
   return (
@@ -187,10 +194,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <main className="flex-1 px-4 flex flex-col gap-3">
         {/* Eggplant Hero Panel */}
         <div className="hero bg-accent text-on-accent rounded-lg p-5 relative flex flex-col gap-3 overflow-hidden shadow-card">
-          {/* Floating Food Art */}
-          <span className="food-art absolute right-3 top-3">
-            <FoodArt />
-          </span>
+          {/* Shopper cut-out, sits behind the search bar */}
+          <img
+            className="hero-photo"
+            src="/hero-shopper.webp"
+            alt=""
+            width={180}
+            height={247}
+            decoding="async"
+          />
 
           {/* Typing headline (animated per character, then the logo phase) */}
           <div className="stage" role="heading" aria-level={1} aria-label={`${HERO_HEADLINE}. CheckAm.`}>
@@ -204,16 +216,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
           </div>
 
-          <p className="text-[14px] leading-snug opacity-90 max-w-[260px]">
+          <p className="text-[14px] leading-snug opacity-90 max-w-[170px]">
             {HERO_SUBLINE}
           </p>
 
           {/* SearchBar with Scan Shortcut */}
-          <SearchBar
-            placeholder="Name or NAFDAC no."
-            onFocus={() => onOpenSearch()}
-            onScan={onOpenScan}
-          />
+          <div className="hero-search">
+            <SearchBar
+              placeholder="Name or NAFDAC no."
+              onFocus={() => onOpenSearch()}
+              onScan={onOpenScan}
+            />
+            {ai.enabled && isOnline && (
+              <AiSearchButton onAsk={() => onOpenSearch('', { askAi: true })} />
+            )}
+          </div>
         </div>
 
         {/* Offline Pill Indicator - Shown ONLY when device is offline */}
@@ -231,9 +248,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           />
         )}
 
-        {/* PWA In-App Install Banner */}
-        <InstallBanner />
-
         {/* Category Thumbs Grid */}
         <div className="cats" role="navigation" aria-label="Product categories">
           <div onClick={() => handleCategoryClick('Food')}>
@@ -245,11 +259,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <span>Drinks</span>
           </div>
           <div onClick={() => handleCategoryClick('Care')}>
-            <Thumb kind="tube" size="md" />
+            <Thumb kind="jar" size="md" />
             <span>Care</span>
           </div>
           <div onClick={() => handleCategoryClick('Meds')}>
-            <Thumb kind="sachet" size="md" />
+            <Thumb kind="capsule" size="md" />
             <span>Meds</span>
           </div>
         </div>
@@ -353,6 +367,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       {/* Persistent Bottom TabBar */}
       <TabBar active="home" onSelect={onNavigateTab} />
+      {/* PWA install popup: floats above the tab bar, slides up after a moment */}
+      <InstallBanner />
     </div>
   );
 };

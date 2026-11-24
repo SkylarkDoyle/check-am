@@ -120,6 +120,8 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
         ? '⚠️ Subject of Official NAFDAC Public Alert'
         : '❌ Registration Lapsed / Not Found in Registry';
 
+    // Only one link goes in the message: WhatsApp previews the first link, and it should be the
+    // branded CheckAm card (og:image), not a third-party pack photo.
     const messageLines = [
       `*CheckAm Product Verification*`,
       ``,
@@ -127,7 +129,6 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
       `*NAFDAC no:* ${product.nafdac_reg_num}`,
       `*Maker:* ${product.manufacturer}`,
       `*Status:* ${statusText}`,
-      ...(product.external_image_url ? [``, `*Pack photo:* ${product.external_image_url}`] : []),
       ``,
       `🔗 *View on CheckAm:* ${resultUrl}`,
       ``,

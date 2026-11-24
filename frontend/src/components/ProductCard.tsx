@@ -1,5 +1,5 @@
 import React from 'react';
-import { Thumb } from './Thumb';
+import { Thumb, PackKind } from './Thumb';
 import { RegNumber } from './RegNumber';
 import { StatusBadge } from './StatusBadge';
 import { ProductStatus } from '../types';
@@ -14,7 +14,7 @@ export interface ProductCardProps {
   maker?: string;
   regNumber?: string;
   status?: ProductStatus;
-  kind?: 'tin' | 'bottle' | 'sachet' | 'tube';
+  kind?: PackKind;
   imageUrl?: string;
   thumbSlot?: React.ReactNode;
   regSlot?: React.ReactNode;

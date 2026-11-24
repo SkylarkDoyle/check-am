@@ -1289,3 +1289,89 @@
   font-size: 13px;
   color: var(--color-ink-muted);
 }
+
+/* === AI: search-bar sparkle, one-time tip, Search strip === */
+.hero-search { position: relative; }
+.hero-search .ca-search input { padding-right: 34px; }
+.ai-search-btn {
+  position: absolute;
+  right: 56px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  z-index: 2;
+}
+.ai-search-dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--color-surface-alt);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ai-search-dot .ca-sp { transform: scale(0.62); }
+.ai-tip {
+  position: absolute;
+  right: 6px;
+  bottom: calc(100% + 9px);
+  z-index: 3;
+  background: var(--color-ink);
+  color: var(--color-ground);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 7px 10px;
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  pointer-events: none;
+}
+.ai-tip[data-open="true"] { opacity: 1; transform: none; pointer-events: auto; }
+.ai-tip::before {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  right: 62px;
+  width: 9px;
+  height: 9px;
+  background: var(--color-ink);
+  transform: rotate(45deg);
+  border-radius: 2px;
+}
+.ai-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-surface);
+  border: var(--border-w) solid var(--color-accent);
+  border-radius: var(--radius-lg);
+  padding: 10px 10px 10px 14px;
+}
+.ai-strip-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ai-strip-t b { font-family: var(--font-display); font-weight: 900; font-size: 14px; color: var(--color-accent); }
+.ai-strip-t small { font-size: 12px; color: var(--color-ink-muted); }
+.ai-strip-b {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: 800;
+  font-size: 13px;
+  padding: 9px 18px;
+  border-radius: var(--radius-pill);
+  border: 0;
+}
+.ai-strip-b:disabled { opacity: 0.5; }
+.hero-photo { position: absolute; right: -2px; bottom: 0; width: 180px; height: auto; z-index: 0; pointer-events: none; }
+.hero > *:not(.hero-photo) { position: relative; z-index: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .ai-tip { transition: none; }
+}

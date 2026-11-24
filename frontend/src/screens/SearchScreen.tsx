@@ -13,12 +13,14 @@ import {
 } from '../components';
 import { Product, ProductCategory } from '../types';
 import { repository, SearchResultItem } from '../data/repository';
-import { AiEntryCard, AiLookupSheet } from '../components/ai';
+import { AiStrip, AiLookupSheet } from '../components/ai';
 import { AI_FIXTURES, useAiLookup } from '../hooks/useAiLookup';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 interface SearchScreenProps {
   initialQuery?: string;
+  /** Which category chip starts selected (from a Home category tap). */
+  initialCategory?: string;
   onSelectProduct: (product: Product) => void;
   onBack: () => void;
   onOpenScan: () => void;
@@ -27,13 +29,14 @@ interface SearchScreenProps {
 
 export const SearchScreen: React.FC<SearchScreenProps> = ({
   initialQuery = '',
+  initialCategory = 'All',
   onSelectProduct,
   onBack,
   onOpenScan,
   onNavigateTab,
 }) => {
   const [query, setQuery] = useState(initialQuery);
-  const [category, setCategory] = useState<string>('All');
+  const [category, setCategory] = useState<string>(initialCategory);
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [syncDate, setSyncDate] = useState<string>('');
@@ -83,10 +86,18 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
 
   // The AI card needs a typed question that found nothing, and a network connection.
   const showAiCard = !loading && results.length === 0 && query.trim().length >= 3 && isOnline;
+  // Opened from the sparkle on Home (?askai=1): show the strip even before anything is typed.
+  const askAiHint = new URLSearchParams(window.location.search).get('askai') === '1';
+  const showAiStrip = isOnline && (showAiCard || askAiHint);
   const { refreshUsage } = ai;
   useEffect(() => {
-    if (showAiCard) refreshUsage();
-  }, [showAiCard, refreshUsage]);
+    if (showAiStrip) refreshUsage();
+  }, [showAiStrip, refreshUsage]);
+  const canAsk = query.trim().length >= 3;
+  const askAi = () => {
+    if (canAsk) ai.run(query.trim());
+    else document.querySelector<HTMLInputElement>('input[type="search"]')?.focus();
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-ground pb-28 pt-2">
@@ -106,12 +117,19 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
           <SearchBar
             value={query}
             placeholder="Search name or NAFDAC no."
-            autoFocus={!initialQuery}
+            autoFocus={!initialQuery && initialCategory === 'All'}
             onChange={(val) => setQuery(val)}
             onScan={onOpenScan}
           />
         </div>
       </div>
+
+      {/* AI entry sits at the top, under the search bar, so it never pushes the guidance down */}
+      {showAiStrip && ai.enabled && (
+        <div className="px-4 pt-1">
+          <AiStrip remaining={ai.remaining} canAsk={canAsk} onAsk={askAi} />
+        </div>
+      )}
 
       {/* Category Filter Chips */}
       <div className="px-4 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar">
@@ -206,11 +224,6 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
                 state="flag"
               />
             </div>
-
-            {/* Optional AI lookup: only here, only for what the person typed */}
-            {showAiCard && ai.enabled && (
-              <AiEntryCard remaining={ai.remaining} onAsk={() => ai.run(query.trim())} />
-            )}
 
             {/* Scan the label button */}
             <div className="w-full pt-2">

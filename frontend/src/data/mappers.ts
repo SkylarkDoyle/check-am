@@ -6,24 +6,30 @@ import {
 } from '../api/types';
 import { ChecklistItemModel, Product, ProductCategory, SafetyAlert } from '../types';
 
-export function deriveKindFromPackType(
-  packType?: string | null,
-  category?: string | null
-): 'tin' | 'bottle' | 'sachet' | 'tube' {
+export type PackKind = 'tin' | 'bottle' | 'sachet' | 'tube' | 'jar' | 'capsule';
+
+export function deriveKindFromPackType(packType?: string | null, category?: string | null): PackKind {
   if (!packType) {
     if (category === 'Drinks') return 'bottle';
-    if (category === 'Care') return 'tube';
+    if (category === 'Care') return 'jar';
+    if (category === 'Meds') return 'capsule';
     return 'sachet';
   }
   const pt = packType.toLowerCase();
+  if (pt.includes('tablet') || pt.includes('capsule') || pt.includes('blister') || pt.includes('pill')) {
+    return 'capsule';
+  }
+  if (pt.includes('tube') || pt.includes('paste')) {
+    return 'tube';
+  }
+  if (pt.includes('cream') || pt.includes('lotion') || pt.includes('jelly') || pt.includes('ointment') || (pt.includes('jar') && category === 'Care')) {
+    return 'jar';
+  }
   if (pt.includes('bottle') || pt.includes('jar') || pt.includes('syrup') || pt.includes('suspension')) {
     return 'bottle';
   }
   if (pt.includes('tin') || pt.includes('can')) {
     return 'tin';
-  }
-  if (pt.includes('tube') || pt.includes('paste') || pt.includes('cream')) {
-    return 'tube';
   }
   return 'sachet';
 }

@@ -1,3 +1,4 @@
+import { enhanceForOcr } from './enhance';
 import { extractRegCandidates } from './extract';
 import { cropPixels, prepareForOcr } from './image';
 import { ScanDecision, ScanSession } from './session';
@@ -30,6 +31,24 @@ export async function readCrop(crop: Pixels, recognize: RecognizeFn): Promise<st
     if (extractRegCandidates(last).length > 0) return last;
   }
   return last;
+}
+
+/**
+ * The live-camera read: the normal passes first, then, only when they found no number, a second
+ * read of a contrast-enhanced copy (flattens glare and shading on curved or glossy packs).
+ */
+export async function readLiveCrop(
+  crop: Pixels,
+  recognize: RecognizeFn
+): Promise<{ text: string; enhanced: boolean }> {
+  const text = await readCrop(crop, recognize);
+  if (extractRegCandidates(text).length > 0) return { text, enhanced: false };
+  const boosted = enhanceForOcr(crop);
+  for (const mode of ['block', 'sparse'] as ReadMode[]) {
+    const retry = await recognize(boosted, mode);
+    if (extractRegCandidates(retry).length > 0) return { text: retry, enhanced: true };
+  }
+  return { text, enhanced: true };
 }
 
 /**

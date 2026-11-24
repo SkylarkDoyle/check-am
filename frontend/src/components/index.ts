@@ -19,7 +19,6 @@ export * from './Segmented';
 export * from './TabBar';
 export * from './StatusBar';
 export * from './BottomSheet';
-export * from './FoodArt';
 export * from './InstallBanner';
 export * from './Skeleton';
 export * from './BadgeInfoSheet';

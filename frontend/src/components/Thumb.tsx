@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { ImageOff } from 'lucide-react';
 
+/** Pack shape drawn when there is no photo: tin (food), bottle (drinks), jar (care), capsule (meds). */
+export type PackKind = 'tin' | 'bottle' | 'sachet' | 'tube' | 'jar' | 'capsule';
+
 export interface ThumbProps {
-  kind?: 'tin' | 'bottle' | 'sachet' | 'tube';
+  kind?: PackKind;
   size?: 'sm' | 'md' | 'lg' | '72';
   round?: boolean;
   imageUrl?: string;
@@ -89,6 +92,26 @@ export const Thumb: React.FC<ThumbProps> = ({
               <path d="M42 16l4-3 8 11-3 5"></path>
               <path d="M10 25l-2 11 12 9"></path>
               <path d="M26 24l8 14" strokeWidth="5" opacity=".9" stroke="var(--color-accent)"></path>
+            </svg>
+          )}
+          {kind === 'jar' && (
+            <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round" data-k="jar">
+              <rect x="14" y="12" width="36" height="11" rx="3"></rect>
+              <path d="M17 23v26a5 5 0 0 0 5 5h20a5 5 0 0 0 5-5V23"></path>
+              <rect x="17.8" y="31" width="28.4" height="13" fill="var(--color-accent)" stroke="none" opacity=".9"></rect>
+              <path d="M20 17h24" strokeWidth="1.6" opacity=".5"></path>
+              <path d="M55 6v8M51 10h8"></path>
+            </svg>
+          )}
+          {kind === 'capsule' && (
+            <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round" data-k="capsule">
+              <g transform="rotate(-35 26 28)">
+                <rect x="6" y="20" width="40" height="16" rx="8"></rect>
+                <path d="M26 20v16"></path>
+                <path d="M26 20h12a8 8 0 0 1 0 16H26z" fill="var(--color-accent)" stroke="none" opacity=".9"></path>
+              </g>
+              <circle cx="44" cy="45" r="10"></circle>
+              <path d="M37 52l14-14" strokeWidth="2"></path>
             </svg>
           )}
         </>

@@ -57,4 +57,46 @@ export class RegistryIndex {
     }
     return hits.size === 1 ? [...hits][0] : null;
   }
+
+  /**
+   * Registry numbers within two edits of `code`, closest first, for tap-to-pick suggestions.
+   * A look-alike swap (O for 0, L for 1) costs half an edit; any other change, insertion or
+   * deletion costs one. Returns nothing for very short input. Suggestions only: the user still
+   * has to tap one, and nothing is looked up automatically.
+   */
+  closest(code: string, limit = 3): string[] {
+    const q = normalizeReg(code);
+    if (q.length < 5) return [];
+    const MAX_COST = 2;
+    const hits: { reg: string; cost: number }[] = [];
+    for (const [norm, reg] of this.display) {
+      if (Math.abs(norm.length - q.length) > MAX_COST) continue;
+      const cost = editCost(q, norm, MAX_COST);
+      if (cost <= MAX_COST) hits.push({ reg, cost });
+    }
+    hits.sort((a, b) => a.cost - b.cost || a.reg.length - b.reg.length || a.reg.localeCompare(b.reg));
+    return hits.slice(0, limit).map((h) => h.reg);
+  }
+}
+
+function subCost(a: string, b: string): number {
+  if (a === b) return 0;
+  return LOOKALIKES[a]?.includes(b) ? 0.5 : 1;
+}
+
+/** Edit distance with half-cost look-alike swaps; gives up early once it exceeds `max`. */
+function editCost(a: string, b: string, max: number): number {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    let rowMin = i;
+    for (let j = 1; j <= b.length; j++) {
+      const v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + subCost(a[i - 1], b[j - 1]));
+      cur.push(v);
+      if (v < rowMin) rowMin = v;
+    }
+    if (rowMin > max) return max + 1;
+    prev = cur;
+  }
+  return prev[b.length];
 }

@@ -5,3 +5,8 @@ export * from './extract';
 export * from './registry';
 export * from './session';
 export * from './reader';
+export * from './engine';
+export * from './blur';
+export * from './enhance';
+export * from './confirm';
+export * from './diagnostics';

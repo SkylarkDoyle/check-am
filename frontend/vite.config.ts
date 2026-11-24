@@ -21,10 +21,24 @@ export default defineConfig({
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api/],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'],
+        // The scanner engine (about 12 MB with all three core builds) is cached on first use by the
+        // rule below instead of being precached on every install.
+        globIgnores: ['tesseract/**', 'og-*.png', 'share-*.png'],
         runtimeCaching: [
           {
-            // Label reader (Tesseract) engine files. Cached after the first online scan so the
-            // camera reader also starts offline.
+            // Self-hosted scanner worker and core (public/tesseract/). The phone loads only the one
+            // core build it supports, then keeps it for offline use.
+            urlPattern: ({ url }: { url: URL }) => url.pathname.includes('/tesseract/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'tesseract-local',
+              expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [200] }
+            }
+          },
+          {
+            // English traineddata (still on the CDN, see lib/ocr/engine.ts). Cached after the first
+            // online scan so the camera reader also starts offline.
             urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/npm\/(tesseract\.js(-core)?|@tesseract\.js-data).*/i,
             handler: 'CacheFirst',
             options: {

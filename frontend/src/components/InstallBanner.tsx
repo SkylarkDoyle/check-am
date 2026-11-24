@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 import { BottomSheet } from './BottomSheet';
 
@@ -13,6 +13,19 @@ export const InstallBanner: React.FC<InstallBannerProps> = ({
 }) => {
   const { canInstall, isInstalled, isDismissed, isIos, promptInstall, dismiss } = usePwaInstall();
   const [showIosSheet, setShowIosSheet] = useState(false);
+  // The popup slides up a moment after the screen settles, and slides down again when dismissed.
+  const [shown, setShown] = useState(false);
+  const eligible = !isInstalled && canInstall && !isDismissed;
+  useEffect(() => {
+    if (!eligible) return;
+    const t = setTimeout(() => setShown(true), 1800);
+    return () => clearTimeout(t);
+  }, [eligible]);
+
+  const closePopup = () => {
+    setShown(false);
+    setTimeout(dismiss, 350);
+  };
 
   // If already installed, cannot install, or dismissed by user, do not render
   if (isInstalled || !canInstall || isDismissed) {
@@ -31,7 +44,10 @@ export const InstallBanner: React.FC<InstallBannerProps> = ({
   return (
     <>
       <div
-        className={`bg-surface border-2 border-line rounded-lg p-3.5 shadow-card flex items-center justify-between gap-3 ${className}`}
+        className={`fixed left-4 right-4 z-40 mx-auto max-w-[480px] bg-surface border-2 border-ink rounded-lg p-3 shadow-[0_10px_28px_rgba(29,42,26,0.22)] flex items-center justify-between gap-3 transition-all duration-500 ease-out motion-reduce:transition-none ${
+          shown ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'
+        } ${className}`}
+        style={{ bottom: 'calc(96px + env(safe-area-inset-bottom))' }}
         role="region"
         aria-label="App installation banner"
       >
@@ -65,7 +81,7 @@ export const InstallBanner: React.FC<InstallBannerProps> = ({
           </button>
           <button
             type="button"
-            onClick={dismiss}
+            onClick={closePopup}
             aria-label="Dismiss install banner"
             className="w-7 h-7 flex items-center justify-center text-ink-muted hover:text-ink rounded-full hover:bg-surface-alt transition-colors"
           >

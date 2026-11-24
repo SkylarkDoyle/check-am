@@ -105,11 +105,13 @@ const SearchRoute: React.FC<{
   const searchString = useSearch();
   const searchParams = new URLSearchParams(searchString);
   const initialQuery = searchParams.get('q') || '';
+  const initialCategory = searchParams.get('cat') || 'All';
 
   return (
     <SearchScreen
-      key={initialQuery}
+      key={`${initialQuery}|${initialCategory}`}
       initialQuery={initialQuery}
+      initialCategory={initialCategory}
       onSelectProduct={onSelectProduct}
       onBack={onBack}
       onOpenScan={onOpenScan}
@@ -173,12 +175,13 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleOpenSearch = (initialQuery = '') => {
-    if (initialQuery) {
-      setLocation(`/search?q=${encodeURIComponent(initialQuery)}`);
-    } else {
-      setLocation('/search');
-    }
+  const handleOpenSearch = (initialQuery = '', opts?: { askAi?: boolean; category?: string }) => {
+    const params = new URLSearchParams();
+    if (initialQuery) params.set('q', initialQuery);
+    if (opts?.askAi) params.set('askai', '1');
+    if (opts?.category) params.set('cat', opts.category);
+    const qs = params.toString();
+    setLocation(qs ? `/search?${qs}` : '/search');
   };
 
   const navigateToProductResult = (product: Product) => {

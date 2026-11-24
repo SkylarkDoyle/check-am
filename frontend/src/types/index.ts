@@ -20,8 +20,8 @@ export interface Product {
   external_image_url?: string | null;
   source_portal?: string;
   last_synced_at?: string;
-  // Derived for display icons ('tin' | 'bottle' | 'sachet' | 'tube')
-  kind?: 'tin' | 'bottle' | 'sachet' | 'tube';
+  // Derived for display icons ('tin' | 'bottle' | 'sachet' | 'tube' | 'jar' | 'capsule')
+  kind?: 'tin' | 'bottle' | 'sachet' | 'tube' | 'jar' | 'capsule';
   // Alerts and checklist attached when loaded in detail
   alerts?: SafetyAlert[];
   checklist?: ChecklistItemModel[];
@@ -64,7 +64,7 @@ export interface SavedCheck {
   maker: string;
   regNumber: string;
   status: ProductStatus;
-  kind?: 'tin' | 'bottle' | 'sachet' | 'tube';
+  kind?: 'tin' | 'bottle' | 'sachet' | 'tube' | 'jar' | 'capsule';
   savedAt: string;
 }
 
