@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+# App screens that only make sense inside the app
+Disallow: /result/
+Disallow: /search
+Disallow: /scan
+Disallow: /saved
+Disallow: /tesseract/
+
+Sitemap: https://checkam.com.ng/sitemap.xml

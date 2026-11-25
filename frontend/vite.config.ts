@@ -19,7 +19,16 @@ export default defineConfig({
       ],
       workbox: {
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api/],
+        // The guide pages, robots and sitemap are real static files, not app screens, so the service
+        // worker must not answer them with the app shell.
+        navigateFallbackDenylist: [
+          /^\/api/,
+          /^\/faq\//,
+          /^\/how-to-check-nafdac-number\//,
+          /^\/check-a-product-before-you-buy\//,
+          /^\/robots\.txt$/,
+          /^\/sitemap\.xml$/
+        ],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'],
         // The scanner engine (about 12 MB with all three core builds) is cached on first use by the
         // rule below instead of being precached on every install.

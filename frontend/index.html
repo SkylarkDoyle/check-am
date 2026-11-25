@@ -1,30 +1,31 @@
 <!doctype html>
-<html lang="en" data-doop-theme="basket">
+<html lang="en-NG" data-doop-theme="basket">
   <head>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
-    <title>CheckAm · Nigerian Product Registry &amp; Pack Verification</title>
+    <title>CheckAm: Check NAFDAC registered food, drinks and medicines</title>
     <meta
       name="description"
-      content="Check a product against the NAFDAC registry. Works offline. Friendly, plain, objective product verification."
+      content="Look up any food, drink or medicine in the NAFDAC registry by name, number or a photo of the pack. Free, works offline. Check it before you buy it."
     />
+    <link rel="canonical" href="https://checkam.com.ng/" />
+    <meta name="robots" content="index,follow,max-image-preview:large" />
+    <meta name="application-name" content="CheckAm" />
 
     <!-- Link previews (WhatsApp, X, Facebook, LinkedIn). Absolute URLs are required by crawlers. -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="CheckAm" />
+    <meta property="og:locale" content="en_NG" />
     <meta property="og:title" content="CheckAm: Check it before you buy it" />
     <meta
       property="og:description"
       content="Look up any food, drink or medicine in the NAFDAC registry in seconds. Works offline."
     />
-    <meta property="og:url" content="https://check-am.skyware.workers.dev/" />
-    <meta
-      property="og:image"
-      content="https://check-am.skyware.workers.dev/og-3-steps.png"
-    />
+    <meta property="og:url" content="https://checkam.com.ng/" />
+    <meta property="og:image" content="https://checkam.com.ng/og-3-steps.png" />
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -38,10 +39,46 @@
       name="twitter:description"
       content="Look up any food, drink or medicine in the NAFDAC registry in seconds. Works offline."
     />
-    <meta
-      name="twitter:image"
-      content="https://check-am.skyware.workers.dev/og-3-steps.png"
-    />
+    <meta name="twitter:image" content="https://checkam.com.ng/og-3-steps.png" />
+
+    <!-- Structured data: who we are and what the app is (no ratings or claims we cannot back up) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://checkam.com.ng/#org",
+            "name": "CheckAm",
+            "url": "https://checkam.com.ng/",
+            "logo": "https://checkam.com.ng/icons/icon-512.png"
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://checkam.com.ng/#website",
+            "url": "https://checkam.com.ng/",
+            "name": "CheckAm",
+            "inLanguage": "en-NG",
+            "publisher": { "@id": "https://checkam.com.ng/#org" }
+          },
+          {
+            "@type": "WebApplication",
+            "@id": "https://checkam.com.ng/#app",
+            "name": "CheckAm",
+            "url": "https://checkam.com.ng/",
+            "description": "Look up food, drinks and medicines in the NAFDAC registry by name, number or a photo of the pack. Works offline.",
+            "applicationCategory": "UtilitiesApplication",
+            "operatingSystem": "Any",
+            "browserRequirements": "Requires a modern web browser",
+            "inLanguage": "en-NG",
+            "isAccessibleForFree": true,
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "NGN" },
+            "areaServed": { "@type": "Country", "name": "Nigeria" },
+            "publisher": { "@id": "https://checkam.com.ng/#org" }
+          }
+        ]
+      }
+    </script>
 
     <!-- Head snippet from frontend/brand/head-snippet.html -->
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
@@ -66,7 +103,33 @@
   <body
     class="bg-ground text-ink font-body antialiased selection:bg-surface-alt selection:text-ink"
   >
-    <div id="root"></div>
+    <div id="root">
+      <!-- Crawlable content. React replaces this as soon as the app loads. -->
+      <main style="font-family: sans-serif; max-width: 640px; margin: 0 auto; padding: 24px">
+        <h1>CheckAm: check it before you buy it</h1>
+        <p>
+          Look up any food, drink or medicine in the NAFDAC registry by name, NAFDAC number or a
+          photo of the pack. Free, and it works offline.
+        </p>
+        <ul>
+          <li>Search by product name or NAFDAC number</li>
+          <li>Take a photo of the pack and read the number on your phone</li>
+          <li>See NAFDAC public alerts</li>
+          <li>Save and share your checks</li>
+        </ul>
+        <nav aria-label="Guides">
+          <a href="/how-to-check-nafdac-number/">How to check a NAFDAC number</a> &middot;
+          <a href="/check-a-product-before-you-buy/">What to check on the pack before you buy</a>
+          &middot;
+          <a href="/faq/">Questions and answers</a>
+        </nav>
+        <p>
+          CheckAm shows what the NAFDAC public registry says. It does not decide whether a product
+          is genuine and is not affiliated with NAFDAC.
+        </p>
+      </main>
+      <noscript>CheckAm needs JavaScript to run. Please turn it on to search the NAFDAC registry.</noscript>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
     <!-- Cloudflare Web Analytics -->
     <script
