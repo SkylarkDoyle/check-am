@@ -46,26 +46,54 @@ class ProviderError(Exception):
     """The provider failed or refused. The message is safe to log (never contains the key)."""
 
 
+_VERDICT_RULE = (
+    "Start with exactly one verdict sentence that begins with 'Verdict:' and uses one of these: "
+    "'Verdict: Found in public sources', 'Verdict: No public record found' or "
+    "'Verdict: Cannot tell'. Base it only on what sources say, and do not guess. "
+)
+_STYLE_RULE = (
+    "Put the key facts in **bold**. Keep it under 200 words, in plain English for a Nigerian "
+    "shopper. Do not invent what letters or digits in a number mean unless a source says so."
+)
+
+
 def build_query(user_query: str) -> str:
-    """The question sent to the provider, focused on Nigeria and NAFDAC."""
+    """The question sent to the provider: a verdict first, then how to check it yourself."""
     q = _SPACES.sub(" ", user_query).strip()
     if looks_like_reg(q):
         reg = q.upper()
         return (
-            f"Product with NAFDAC registration number {reg} in Nigeria: what is it, "
-            "and what does its "
-            "genuine packaging look like?"
+            f"Is NAFDAC registration number {reg} listed in NAFDAC's public records in Nigeria "
+            "(the NAFDAC Greenbook or verification portal)? "
+            + _VERDICT_RULE
+            + "If found, name the product and the manufacturer. Then give two or three short steps "
+            "to verify the number with NAFDAC directly, and say that a missing web record does not "
+            "prove a product is unregistered. "
+            + _STYLE_RULE
         )
     return (
-        f"What does the genuine {q} packaging sold in Nigeria look like, and what are common signs "
-        "of counterfeit versions? Focus on NAFDAC-registered products."
+        f"Is '{q}' a NAFDAC-registered product sold in Nigeria? "
+        + _VERDICT_RULE
+        + "If found, give its NAFDAC number and manufacturer. Then describe what the genuine pack "
+        "looks like and the common signs to check on the pack, and say that a missing web record "
+        "does not prove a product is unregistered. "
+        + _STYLE_RULE
     )
 
 
+_HL_PAIR = re.compile(r"\[Highlight start\]\s*(.*?)\s*\[Highlight end\]", re.I | re.S)
+_HL_STRAY = re.compile(r"\[Highlight (?:start|end)\]", re.I)
+
+
 def _plain(text: Any) -> str:
+    """Plain text from a provider snippet. The provider marks highlighted words with
+    "[Highlight start]...[Highlight end]"; we turn those into **bold** markers for the app."""
     if not isinstance(text, str):
         return ""
-    return _SPACES.sub(" ", _TAGS.sub("", text)).strip()
+    text = _HL_PAIR.sub(lambda m: "**" + m.group(1) + "**", _TAGS.sub("", text))
+    text = _HL_STRAY.sub("", text)
+    text = re.sub(r"\s+([.,;:!?])", lambda m: m.group(1), text)
+    return _SPACES.sub(" ", text).strip()
 
 
 def _has_phone(text: str) -> bool:

@@ -1,21 +1,33 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BottomSheet } from '../BottomSheet';
 import { Button } from '../Button';
 import { Disclaimer } from '../Disclaimer';
 import { AiLoadingLines } from './AiLoadingLines';
 import { AiSparkle } from './AiSparkle';
 import { AI_DISCLAIMER, AiBlock, AiListItem, AiLookupState } from './types';
+import {
+  VERDICT_LABEL,
+  VERDICT_NOTE,
+  buildAiShareText,
+  inlineParts,
+  verdictOf,
+  withoutVerdictLine,
+  whatsappUrl,
+} from '../../lib/aiAnswer';
+import { isAiSaved, removeAiAnswer, saveAiAnswer } from '../../lib/aiSaved';
 
 export interface AiLookupSheetProps {
   isOpen: boolean;
   state: AiLookupState;
   query: string;
-  /** Lookups left today, shown under the result and on the limit state. */
-  remaining: number;
+  /** Lookups left today, shown under the result and on the limit state. Leave out to hide it. */
+  remaining?: number;
   limit?: number;
   onClose: () => void;
   onScan: () => void;
   onEditSearch: () => void;
+  /** Tell the person something happened ("Saved to this phone"). */
+  onToast?: (message: string) => void;
 }
 
 const COUNTRY_NOTE = 'Packaging can differ by country. Check the NAFDAC number on your own pack.';
@@ -28,12 +40,23 @@ function sourceDomain(url: string): string {
   }
 }
 
+/** Text with **bold** parts (or key terms) shown in bold. */
+function Rich({ text }: { text: string }) {
+  return (
+    <>
+      {inlineParts(text).map((p, i) =>
+        p.bold ? <strong key={i} className="font-extrabold text-ink">{p.text}</strong> : <React.Fragment key={i}>{p.text}</React.Fragment>
+      )}
+    </>
+  );
+}
+
 function ListItems({ items }: { items: AiListItem[] }) {
   return (
     <div className="flex flex-col gap-1.5">
       {items.map((it, i) => (
         <div key={i}>
-          <div className="ai-li">{it.text}</div>
+          <div className="ai-li"><span className="min-w-0"><Rich text={it.text} /></span></div>
           {it.items && it.items.length > 0 && (
             <div className="pl-4 mt-1">
               <ListItems items={it.items} />
@@ -50,7 +73,7 @@ function Blocks({ blocks }: { blocks: AiBlock[] }) {
     <div className="flex flex-col gap-2.5">
       {blocks.map((b, i) => {
         if (b.type === 'heading') return <div key={i} className="ai-sh">{b.text}</div>;
-        if (b.type === 'paragraph') return <p key={i} className="ai-p">{b.text}</p>;
+        if (b.type === 'paragraph') return <p key={i} className="ai-p"><Rich text={b.text} /></p>;
         return <ListItems key={i} items={b.items} />;
       })}
     </div>
@@ -77,7 +100,41 @@ export const AiLookupSheet: React.FC<AiLookupSheetProps> = ({
   onClose,
   onScan,
   onEditSearch,
+  onToast,
 }) => {
+  const [saved, setSaved] = useState(false);
+  const result = state.status === 'result' ? state.data : null;
+
+  // Is this question already saved?
+  useEffect(() => {
+    if (!isOpen || !result) return;
+    let live = true;
+    isAiSaved(query).then((v) => live && setSaved(v));
+    return () => {
+      live = false;
+    };
+  }, [isOpen, result, query]);
+
+  const handleSave = async () => {
+    if (!result) return;
+    if (saved) {
+      await removeAiAnswer(query);
+      setSaved(false);
+      onToast?.('Removed from saved');
+      return;
+    }
+    const ok = await saveAiAnswer(query, result);
+    setSaved(ok);
+    onToast?.(ok ? 'Saved to this phone' : 'Could not save on this phone');
+  };
+
+  const handleShare = () => {
+    if (!result) return;
+    window.open(whatsappUrl(buildAiShareText(query, result)), '_blank');
+  };
+
+  const verdict = result ? verdictOf(result.blocks) : 'unknown';
+
   return (
     <BottomSheet isOpen={isOpen} onClose={onClose} title="AI lookup">
       {state.status === 'loading' && (
@@ -99,7 +156,11 @@ export const AiLookupSheet: React.FC<AiLookupSheetProps> = ({
         <>
           <Heading>AI summary</Heading>
           <h2 className="ai-t" style={{ fontSize: 20 }}>{query}</h2>
-          <Blocks blocks={state.data.blocks} />
+          <div className="ai-verdict" data-v={verdict}>
+            <b>{VERDICT_LABEL[verdict]}</b>
+            <span>{VERDICT_NOTE[verdict]}</span>
+          </div>
+          <Blocks blocks={withoutVerdictLine(state.data.blocks)} />
           {state.data.sources.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {state.data.sources.map((s, i) => (
@@ -118,8 +179,14 @@ export const AiLookupSheet: React.FC<AiLookupSheetProps> = ({
           )}
           <div className="ai-note">{COUNTRY_NOTE}</div>
           <Disclaimer text={`${AI_DISCLAIMER} Not from NAFDAC.`} />
+          <div className="grid grid-cols-2 gap-2">
+            <Button tone="secondary" label={saved ? 'Saved' : 'Save'} onClick={handleSave} />
+            <Button tone="secondary" label="Share on WhatsApp" onClick={handleShare} />
+          </div>
           <Button tone="primary" width="full" label="Done" onClick={onClose} />
-          <div className="ai-cnt">{remaining} {remaining === 1 ? 'lookup' : 'lookups'} left today</div>
+          {remaining !== undefined && (
+            <div className="ai-cnt">{remaining} {remaining === 1 ? 'lookup' : 'lookups'} left today</div>
+          )}
         </>
       )}
 

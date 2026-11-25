@@ -21,6 +21,7 @@ function fixtureResult(query: string, remaining: number): AiLookupResult {
     result: 'ok',
     cached: false,
     blocks: [
+      { type: 'paragraph', text: '**Verdict: No public record found** for this question in web sources.' },
       { type: 'heading', text: 'What the genuine pack looks like' },
       {
         type: 'list',

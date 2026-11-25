@@ -8,6 +8,9 @@ import {
 } from '../components';
 import { Product, SavedCheck } from '../types';
 import { repository } from '../data/repository';
+import { AiLookupSheet, AiSparkle } from '../components/ai';
+import { VERDICT_LABEL, verdictOf } from '../lib/aiAnswer';
+import { SavedAiAnswer, clearAiSaved, listAiSaved, removeAiAnswer } from '../lib/aiSaved';
 
 interface SavedScreenProps {
   onNavigateProduct: (product: Product) => void;
@@ -23,10 +26,20 @@ export const SavedScreen: React.FC<SavedScreenProps> = ({
   const [filterIndex, setFilterIndex] = useState<1 | 2 | 3>(1); // 1: All, 2: Match, 3: Alert
   const [savedChecks, setSavedChecks] = useState<SavedCheck[]>([]);
   const [loading, setLoading] = useState(true);
+  const [aiSaved, setAiSaved] = useState<SavedAiAnswer[]>([]);
+  const [openAi, setOpenAi] = useState<SavedAiAnswer | null>(null);
 
   useEffect(() => {
     loadSavedChecks();
   }, [filterIndex]);
+
+  // AI summaries kept on this phone; they refresh when one is saved or removed elsewhere.
+  useEffect(() => {
+    const load = () => listAiSaved().then(setAiSaved);
+    load();
+    window.addEventListener('app:saved-checks-updated', load);
+    return () => window.removeEventListener('app:saved-checks-updated', load);
+  }, []);
 
   const loadSavedChecks = async () => {
     setLoading(true);
@@ -60,6 +73,8 @@ export const SavedScreen: React.FC<SavedScreenProps> = ({
 
   const handleClearAll = async () => {
     await repository.clearSavedChecks();
+    await clearAiSaved();
+    setAiSaved([]);
     setSavedChecks([]);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('app:saved-checks-updated'));
@@ -92,7 +107,7 @@ export const SavedScreen: React.FC<SavedScreenProps> = ({
       {/* Screen Header */}
       <div className="px-4 py-3 flex items-center justify-between">
         <h1 className="font-display font-black text-title text-ink">Saved checks</h1>
-        {savedChecks.length > 0 && (
+        {(savedChecks.length > 0 || aiSaved.length > 0) && (
           <button
             type="button"
             className="text-xs font-bold text-ink-muted underline hover:text-ink transition-colors"
@@ -120,8 +135,11 @@ export const SavedScreen: React.FC<SavedScreenProps> = ({
             <ProductCardSkeleton layout="row" />
             <ProductCardSkeleton layout="row" />
           </div>
-        ) : savedChecks.length > 0 ? (
+        ) : savedChecks.length > 0 || (filterIndex === 1 && aiSaved.length > 0) ? (
           <div className="flex flex-col gap-2.5">
+            {savedChecks.length === 0 && (
+              <p className="text-xs text-ink-muted">No saved product checks yet.</p>
+            )}
             {savedChecks.map((item) => (
               <ProductCard
                 key={item.id}
@@ -134,6 +152,35 @@ export const SavedScreen: React.FC<SavedScreenProps> = ({
                 onClick={() => handleClickItem(item)}
               />
             ))}
+            {filterIndex === 1 && aiSaved.length > 0 && (
+              <section aria-label="Saved AI summaries" className="mt-3 flex flex-col gap-2.5">
+                <h2 className="font-display font-black text-[17px] text-ink">AI summaries</h2>
+                {aiSaved.map((item) => (
+                  <div key={item.id} className="flex items-center gap-3 rounded-lg border-w border-line bg-surface p-3.5 shadow-sm">
+                    <button type="button" className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => setOpenAi(item)}>
+                      <AiSparkle />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-display text-[15px] font-black text-ink">{item.query}</span>
+                        <span className="block text-xs text-ink-muted">
+                          {VERDICT_LABEL[verdictOf(item.result.blocks)]} · {new Date(item.savedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                        </span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Remove ${item.query}`}
+                      className="h-8 w-8 rounded-full text-ink-muted hover:bg-surface-alt"
+                      onClick={async () => {
+                        await removeAiAnswer(item.query);
+                        onShowToast('Removed from saved');
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </section>
+            )}
           </div>
         ) : (
           /* Empty State */
@@ -157,6 +204,19 @@ export const SavedScreen: React.FC<SavedScreenProps> = ({
           </div>
         )}
       </main>
+
+      <AiLookupSheet
+        isOpen={openAi !== null}
+        state={openAi ? { status: 'result', data: openAi.result } : { status: 'idle' }}
+        query={openAi?.query ?? ''}
+        onClose={() => setOpenAi(null)}
+        onScan={() => {
+          setOpenAi(null);
+          onNavigateTab('scan');
+        }}
+        onEditSearch={() => setOpenAi(null)}
+        onToast={onShowToast}
+      />
 
       {/* TabBar */}
       <TabBar active="saved" onSelect={onNavigateTab} />

@@ -30,7 +30,8 @@ class Settings(BaseSettings):
     ai_none_ttl_days: int = 7
     ai_timeout_seconds: float = 25.0
     ai_poll_seconds: float = 20.0
-    ai_prompt_version: int = 1
+    # Bump when the prompt changes so old cached answers are not served for the new question.
+    ai_prompt_version: int = 2
     ai_ip_salt: str = "checkam"
     # Pool sizing: keep small on Neon free + FastAPI Cloud Nano (500 MiB).
     db_pool_min: int = 1

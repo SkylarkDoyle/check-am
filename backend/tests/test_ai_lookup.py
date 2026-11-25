@@ -36,6 +36,14 @@ def test_build_query_is_nigeria_and_nafdac_focused() -> None:
     assert "NAFDAC registration number A4-2260" in reg
 
 
+def test_build_query_asks_for_a_verdict_first_and_does_not_overclaim() -> None:
+    for text in ("A4-2260", "Colgate toothpaste"):
+        q = serpapi.build_query(text)
+        assert "Verdict: No public record found" in q
+        assert "does not prove" in q
+        assert "**bold**" in q
+
+
 def test_cache_key_ignores_case_and_punctuation() -> None:
     assert serpapi.cache_key("Colgate  Toothpaste!", 1) == serpapi.cache_key(
         "colgate toothpaste", 1
@@ -315,3 +323,9 @@ async def test_meta_and_usage_report_enabled(client: AsyncClient, provider: Fake
     assert (await client.get("/api/v1/meta")).json()["ai_lookup_enabled"] is True
     usage = (await client.get(f"{URL}/usage", headers=headers(device()))).json()
     assert usage["enabled"] is True and usage["limit"] == 5 and usage["remaining"] == 5
+
+
+def test_plain_turns_provider_highlight_markers_into_bold() -> None:
+    out = serpapi._plain("Verdict: [Highlight start] No public record found [Highlight end] .")
+    assert out == "Verdict: **No public record found**."
+    assert "Highlight" not in serpapi._plain("a [Highlight start] b")

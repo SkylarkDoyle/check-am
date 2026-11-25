@@ -1375,3 +1375,29 @@
 @media (prefers-reduced-motion: reduce) {
   .ai-tip { transition: none; }
 }
+
+/* === AI answer: verdict, registry line === */
+.ai-verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: var(--border-thin) solid var(--color-line);
+  background: var(--color-surface-alt);
+}
+.ai-verdict b { font-family: var(--font-display); font-weight: 900; font-size: 15px; }
+.ai-verdict span { font-size: 12.5px; color: var(--color-ink); line-height: 1.4; }
+.ai-verdict[data-v="found"] { background: var(--color-ok-bg); border-color: var(--color-ok); }
+.ai-verdict[data-v="found"] b { color: var(--color-ok); }
+.ai-verdict[data-v="none"] { background: var(--color-warn-bg); border-color: var(--color-warn); }
+.ai-verdict[data-v="none"] b { color: var(--color-warn); }
+.ai-reg {
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: var(--border-thin) solid var(--color-line);
+  background: var(--color-surface);
+}
+.ai-reg[data-found="true"] { border-color: var(--color-ok); }
+.ai-reg[data-found="false"] { border-color: var(--color-warn); }

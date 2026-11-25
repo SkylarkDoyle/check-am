@@ -26,6 +26,19 @@ function createMiniSearchInstance(): MiniSearch<Product> {
   });
 }
 
+
+const STOP_WORDS = new Set(['and', 'the', 'of', 'for', 'with', 'in', 'a', 'an', 'to', 'by']);
+
+/** The words that must all match: lower-cased, without filler such as "and" or "the". */
+export function significantWords(query: string): string[] {
+  const words = query
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+  const kept = words.filter((w) => !STOP_WORDS.has(w));
+  return kept.length > 0 ? kept : words;
+}
+
 export async function ensureSearchIndex(): Promise<void> {
   if (searchIndex && productCache.size > 0) {
     return;
@@ -147,34 +160,26 @@ export async function localSearchProducts(
     }
   }
 
-  // 2. Full-text search on product_name, brand_name, manufacturer with MiniSearch
+  // 2. Full-text search on product_name, brand_name, manufacturer with MiniSearch.
+  // Every meaningful word must match. There is deliberately no "any word" fallback: a query like
+  // "gino party jollof" that matches nothing as a whole must say "not found", not list every
+  // product that shares one word with it.
   if (results.length < limit && searchIndex && searchIndex.documentCount > 0) {
-    let textMatches = searchIndex.search(q, {
-      combineWith: 'AND',
-      prefix: true,
-      fuzzy: (term: string) => (term.length > 3 ? 0.2 : false),
-      boost: {
-        product_name: 2.5,
-        brand_name: 2.5,
-        manufacturer: 1.0,
-      },
-      filter: category ? (doc) => (doc as any).category === category : undefined,
-    });
-
-    if (textMatches.length === 0 && q.includes(' ')) {
-      // Fallback to OR combination if multi-word query had 0 AND results
-      textMatches = searchIndex.search(q, {
-        combineWith: 'OR',
-        prefix: true,
-        fuzzy: (term: string) => (term.length > 3 ? 0.2 : false),
-        boost: {
-          product_name: 2.5,
-          brand_name: 2.5,
-          manufacturer: 1.0,
-        },
-        filter: category ? (doc) => (doc as any).category === category : undefined,
-      });
-    }
+    const words = significantWords(q);
+    const textMatches = words.length
+      ? searchIndex.search(words.join(' '), {
+          combineWith: 'AND',
+          prefix: (term: string) => term.length >= 3,
+          // Typo tolerance only on longer words, so short words do not turn into other words.
+          fuzzy: (term: string) => (term.length > 5 ? 0.2 : false),
+          boost: {
+            product_name: 2.5,
+            brand_name: 2.5,
+            manufacturer: 1.0,
+          },
+          filter: category ? (doc) => (doc as any).category === category : undefined,
+        })
+      : [];
 
     for (const hit of textMatches) {
       if (!seenIds.has(hit.id)) {

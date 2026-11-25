@@ -1,6 +1,7 @@
 import Dexie, { Table } from 'dexie';
 import { ApiChecklistResponse } from '../api/types';
 import { ChecklistProgressRecord, Product, SafetyAlert, SavedCheck } from '../types';
+import type { SavedAiAnswer } from '../lib/aiSaved';
 
 export interface ChecklistRecord {
   category: string;
@@ -16,6 +17,7 @@ export class CheckAmDatabase extends Dexie {
   checklist_progress!: Table<ChecklistProgressRecord, [string, string]>;
   saved!: Table<SavedCheck, number>;
   settings!: Table<{ key: string; value: any }, string>;
+  ai_saved!: Table<SavedAiAnswer, number>;
 
   constructor() {
     super('checkam_db');
@@ -43,6 +45,11 @@ export class CheckAmDatabase extends Dexie {
         await tx.table('products').filter((p) => String(p.id).startsWith('prod-')).delete();
         await tx.table('alerts').filter((a) => String(a.id).startsWith('alert-')).delete();
       });
+
+    // Schema v3: AI summaries the person saved (stays on this phone)
+    this.version(3).stores({
+      ai_saved: '++id, key, savedAt',
+    });
   }
 }
 
