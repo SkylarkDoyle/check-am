@@ -23,9 +23,9 @@ export default defineConfig({
         // worker must not answer them with the app shell.
         navigateFallbackDenylist: [
           /^\/api/,
-          /^\/faq\//,
-          /^\/how-to-check-nafdac-number\//,
-          /^\/check-a-product-before-you-buy\//,
+          /^\/faq(\/|$)/,
+          /^\/how-to-check-nafdac-number(\/|$)/,
+          /^\/check-a-product-before-you-buy(\/|$)/,
           /^\/robots\.txt$/,
           /^\/sitemap\.xml$/
         ],
