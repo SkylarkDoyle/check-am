@@ -513,9 +513,34 @@
 }
 .ca-card-r {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap; /* the NAFDAC number and the status badge always share one line */
   align-items: center;
-  gap: var(--spacing-2);
+  gap: 6px;
+  min-width: 0;
+}
+.ca-card-r .ca-reg { flex: none; }
+.ca-card-r .ca-reg-k { padding: 5px 5px; font-size: 9px; letter-spacing: .05em; }
+.ca-card-r .ca-reg-v { padding: 5px 6px; font-size: 11px; letter-spacing: .02em; }
+.ca-card-r .ca-badge {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  padding: 3px 7px 3px 6px;
+  gap: 4px;
+  font-size: 11px;
+}
+.ca-card-r .ca-badge svg { width: 12px; height: 12px; }
+.ca-card-r .ca-badge { overflow: hidden; }
+.ca-card-r .ca-badge > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 360px) {
+  .ca-card-r { gap: 4px; }
+  .ca-card-r .ca-reg-k { padding: 4px 4px; font-size: 8px; }
+  .ca-card-r .ca-reg-v { padding: 4px 5px; font-size: 10px; }
+  .ca-card-r .ca-badge { padding: 3px 6px 3px 5px; gap: 3px; font-size: 10px; }
+  .ca-card-r .ca-badge svg { width: 11px; height: 11px; }
+  .ca-card-r .ca-badge-x { display: none; }
+  .ca-card { gap: var(--spacing-2); }
+  .ca-card[data-layout="row"] .ca-card-th .ca-thumb { width: 52px; height: 52px; }
 }
 .ca-card[data-layout="tile"] {
   flex-direction: column;

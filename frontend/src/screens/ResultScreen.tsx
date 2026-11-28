@@ -8,7 +8,8 @@ import {
   Button,
   Disclaimer,
   RegNumber,
-  BottomSheet
+  BottomSheet,
+  FeedbackSheet
 } from '../components';
 import { Product, ChecklistItemModel, ChecklistState } from '../types';
 import { formatDisplayDate } from '../data/mappers';
@@ -30,6 +31,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
   const [isSaved, setIsSaved] = useState(false);
   const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [checklist, setChecklist] = useState<ChecklistItemModel[]>([]);
   const [syncDate, setSyncDate] = useState<string>('');
 
@@ -338,9 +340,16 @@ Inspect the pack yourself. CheckAm shows what the NAFDAC registry says. It does 
         </div>
 
         {/* Legal disclaimer */}
-        <div className="pt-1 pb-4">
+        <div className="pt-1 pb-2">
           <Disclaimer />
         </div>
+
+        <p className="pb-4 text-center text-[13px] text-ink-muted">
+          Something wrong with this result?{' '}
+          <button type="button" className="font-extrabold text-ink underline" onClick={() => setReportOpen(true)}>
+            Report a problem
+          </button>
+        </p>
       </main>
 
       {/* Sticky action bar: progress, then Save and Share (Doop component CheckBar) */}
@@ -416,6 +425,13 @@ Inspect the pack yourself. CheckAm shows what the NAFDAC registry says. It does 
           <Button tone="ghost" width="full" label="Cancel" onClick={() => setShareSheetOpen(false)} />
         </div>
       </BottomSheet>
+
+      <FeedbackSheet
+        isOpen={reportOpen}
+        onClose={() => setReportOpen(false)}
+        initialKind="wrong_data"
+        context={{ screen: 'result', reg_number: product.nafdac_reg_num }}
+      />
     </div>
   );
 };

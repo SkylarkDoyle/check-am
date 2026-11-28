@@ -1,6 +1,6 @@
 # CheckAm Design System: "Basket"
 
-Version 1.0 · Source of truth: Doop canvas `PUQwV-eftz` (pages "Brand and System", "Screens" and "Components")
+Version 1.1 (28 Nov 2026) · Source of truth: Doop canvas `PUQwV-eftz` (pages "Brand and System", "Screens" and "Components")
 Theme key in code: `data-doop-theme="basket"`
 
 CheckAm is an offline-first PWA that checks a Nigerian consumer product against the NAFDAC public registry. Basket is the concept that treats that check as a friendly word from a trusted market trader: warm, plain, a little playful, and never the one deciding what is "fake".
@@ -28,6 +28,8 @@ CheckAm is an offline-first PWA that checks a Nigerian consumer product against 
 **What it is not:** an official NAFDAC product, a counterfeit detector, a community "fake" report board, or a government-styled site. Do not use NAFDAC's name as a brand mark, logo, or colour source.
 
 ---
+
+> **Note on sections 2 to 12:** the committed copy of this file jumps from section 2 to section 13, so those sections (product rules table, tokens, type, components, states) are not in the repo. The Doop canvas `PUQwV-eftz`, page "Brand and System", still holds them. Section 17.1 below restates the token values the app uses.
 
 ## 2. Non-negotiable product rules (from the PRD)
 
@@ -73,6 +75,8 @@ CheckAm is an offline-first PWA that checks a Nigerian consumer product against 
 
 ## 14. Added screens, components and Home animation
 
+> Superseded in part by section 17: the Home hero now uses a photo and the title "Check it before you buy it", and the typing animation and "Hello" line below describe the earlier version.
+
 Canvas: page "Screens".
 
 **New components:** `Logo` (tone default/reversed, layout horizontal/stacked, size sm/md/lg; wordmark is live text), `Toggle` (off/on/disabled; the on state shows a tick), `SettingRow` (title, detail, control slot, min height 64px), `Segmented` (3 options, `active` 1 to 3).
@@ -103,6 +107,8 @@ Hero asset reference: `frontend/brand/logo-stacked/checkam-logo-stacked-hero-{10
 ---
 
 ## 15. Hero food art (SVG reference)
+
+> Retired in November 2026: the SVG food art was replaced by a shopper photo (section 17.3). Keep this section only as history; `FoodArt.tsx` was deleted.
 
 Exact source: [`frontend/src/assets/brand/hero-food-art.svg`](frontend/src/assets/brand/hero-food-art.svg). Do not redraw it; inline the file or import it as a React component (`?react` with `vite-plugin-svgr`). It is the decorative illustration at the top right of the Home hero, shown with the "What are you buying today?" headline.
 
@@ -196,6 +202,8 @@ Same sheet and the same 4:3 image container as 16.2. Order: grab handle, "Share 
 
 ### 16.4 Home: All products feed
 
+> Updated in section 17.4: the feed is now a list of rows with thumbnails, not two-column tiles.
+
 - Under "Just checked" a header row: "All products" (Nunito 900, `--text-title`) and the count "4,820 products" (13px bold, muted).
 - Grid: 2 columns, 12px gap, the same `ProductCard layout="tile"` as "Just checked". **10 items per page** (5 rows).
 - After the first page: "Showing 10 of 4,820" and a ghost "Load more" button (keyboard and screen-reader fallback).
@@ -203,3 +211,88 @@ Same sheet and the same 4:3 image container as 16.2. Order: grab handle, "Share 
 - **Loading more frame:** a centred row with a rotating arc (20px, 0.9s linear) and "Loading 10 more", then skeleton tiles with the same size as real tiles (white card, `--color-line` border, image block, three bars) pulsing at 1.4s. Respect `prefers-reduced-motion` (no rotation or pulse).
 - **End of list frame:** "You have seen all 4,820 products" (Nunito 900, lead size), "Registry synced 18 Nov 2026" (13px muted) and a secondary "Back to top" button.
 - Keep the TabBar reachable at all times; never load a page that pushes the tab bar offscreen.
+
+---
+
+## 17. Updates, November 2026 (version 1.1)
+
+Canvas: page "Screens" unless noted; marketing frames are on page "Social".
+
+### 17.1 Token reference (theme `basket`)
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `--color-ground` | `#EAF4E1` | Screen background |
+| `--color-surface` | `#FFFFFF` | Cards, sheets, inputs |
+| `--color-surface-alt` | `#DCEBD0` | Chips, thumbs, quiet fills |
+| `--color-ink` / `--color-ink-muted` | `#1D2A1A` / `#55654F` | Text, strong strokes |
+| `--color-line` | `#C5DBB6` | Hairlines |
+| `--color-accent` / `--color-on-accent` | `#4B2A7B` / `#FFFFFF` | The one action colour (eggplant) |
+| `--color-ok` / `--color-ok-bg` | `#176B30` / `#CFEFC9` | Registry match only |
+| `--color-warn` / `--color-warn-bg` | `#8A4B00` / `#FFE0A3` | Lapsed, not found, "no public record" |
+| `--color-alert` / `--color-alert-bg` | `#A8200F` / `#FFD6CF` | Public alert |
+| Radii | 12 / 20 / 28 px | sm / md / lg |
+| Border | 2px (`--border-w`), 1px-ish thin (`--border-thin`) | |
+| Fonts | Nunito 900 display, DM Sans body, IBM Plex Mono for numbers | |
+
+### 17.2 Components added or changed
+
+New in Doop: `AiSparkle`, `AiLoadingLines`, `AiStrip`, `InstallPopup`, `ProductCardSkeleton`, `ChecklistRow`, `BadgeLegendRow`, `CheckBar`. Superseded and kept only as history: `AiEntryCard` (replaced by `AiStrip`), `AiPill` and `AiTip` (replaced by the sparkle in the search bar).
+Changed: `Thumb` gained kinds `jar` and `capsule`; `ProductCard` row layout keeps its number and badge on one line; `AlertBanner` arrows are 28px ringed circles; `StatusBadge` is tappable and opens the badge meaning sheet.
+
+### 17.3 Home hero
+
+- **Photo:** a transparent cut-out of a shopper holding a phone and a red basket, 180px wide, bottom-right, `right: -2px`, behind the search bar (`z-index` below the other hero children, `pointer-events: none`). Source `frontend/public/hero-shopper.webp`. Replaces the food art.
+- **Copy:** no "Hello" line. Headline "Check it before you buy it" (26 characters, same typing animation and logo phase), then the subtitle "Look up any food, drink or medicine in the NAFDAC registry, or scan the pack." (14px, weight 500, max width about 170 to 190px so it never runs under the figure).
+- **AI sparkle in the search bar:** a 26px round `--color-surface-alt` button with the `AiSparkle` scaled to 0.62, left of the scan button, with a 44px tap area. A one-time tip (dark bubble, 11px bold, "Can't find it? Ask AI") sits above the bar, right-aligned with its arrow over the sparkle. It appears after about 1.5 seconds, closes after 5 seconds or on tap, and shows once per device. It is not shown when AI is off or the phone is offline.
+- The alert banner sits directly under the hero.
+
+### 17.4 Icons and the All products list
+
+- **Category icons:** Food = tin, Drinks = bottle, Care = cream jar with a small plus at the top right, Meds = capsule plus round tablet. Thumb kinds: `tin`, `bottle`, `sachet`, `tube`, `jar`, `capsule`. Stroke 2.4, eggplant label band.
+- **All products:** one product per row with its thumbnail (the same row as the Saved tab). No tiles. "Just checked" keeps tiles. Skeleton rows replace skeleton tiles.
+- **Number and badge on one line (all breakpoints):** the NAFDAC number and the status badge never wrap. Sizes inside a product row: number 11px (label 9px), badge 11px with a 12px icon. At 360px and narrower: number 10px, badge 10px with an 11px icon, the lapsed badge shortens to "Lapsed" (the "/ not found" part is hidden but stays in the accessible name), the row thumbnail is 52px, and a badge that still does not fit truncates with an ellipsis.
+- **Footer guides:** at the end of the list, a small "GUIDES" label and three underlined links.
+
+### 17.5 Install popup
+
+A floating card above the tab bar (not under the alert): app icon tile, "Install CheckAm", "Fast, 1-tap pack check. Works offline.", an Install pill and a dismiss cross. It slides up and fades in about 1.8 seconds after Home opens, slides down on dismiss, and has no motion under `prefers-reduced-motion`. Frame: `Home / Install popup`.
+
+### 17.6 Scan screen (photo, not live scanning)
+
+The live scanning loop was removed. Four states, full-screen on the camera colour:
+1. **Camera** (`Scan`): back and light buttons, offline pill, aiming box with a white-outlined eggplant border and the hint "Put the NAFDAC number in the box, then tap the button.", bottom bar with "Type it", a 76px white shutter and an empty right slot.
+2. **Adjust box:** the photo, a dashed white box with four 20px corner handles and a dimmed surround, "Adjust the box" title, "Drag the box over the number.", Retake and Read number buttons.
+3. **Reading:** same view, a line moving across the box, "Reading the photo…".
+4. **Got it sheet:** an editable number field with Check, a "Did you mean" row of up to three registry chips, a one-line reason, and "Retake photo". Nothing is looked up until Check is tapped.
+Camera blocked: "Take a photo" opens the phone's own camera app.
+
+### 17.7 AI lookup
+
+- **Entry:** a slim `AiStrip` at the top of the Search not-found screen (sparkle, "Not in the registry? Use AI", "N lookups left today", an "Ask" button). It replaces the large card and never pushes the guidance down.
+- **Result sheet:** a verdict card first (green "Found in public sources", amber "No public record found", grey "Cannot tell", each with a one-line note in normal ink colour), then the answer with **bold** highlights, source chips, the country note, the disclaimer "AI responses may include mistakes. Not from NAFDAC.", a "Was this helpful?" thumbs row, Save and Share on WhatsApp, Done, and a guide link. No "in the CheckAm registry list" line: it contradicted the AI.
+- **Bullets** are laid out as one text block per bullet so bold words never split a line into columns.
+- **Saved:** the Saved tab has an "AI summaries" section under the product checks (sparkle, question, verdict and date, a remove cross). Saved AI answers live only on the phone.
+
+### 17.8 Saved screen header
+
+Left-aligned "Saved checks" title (Nunito 900), a small "Clear all" link on the right when there is anything to clear, then the three-option `Segmented` control (All, Match, Alert). No round icon buttons, no subtitle line.
+
+### 17.9 Feedback
+
+- **About:** a "HELP US IMPROVE" panel with a "Send feedback" row.
+- **Sheet:** title, one explanatory line, optional context chip ("About A4-2260"), type chips (Bug, Wrong data, Idea, Other), a message box with a 0 / 1000 counter, an optional contact field ("We only use this to reply. No account needed."), Send feedback and Cancel. Sent state: green tick circle, "Thanks, we got it", Done. Frames: `Feedback / Sheet`, `Feedback / Sheet from result`, `Feedback / Sent`.
+- **Result screen:** a small centred "Something wrong with this result? Report a problem" link under the disclaimer.
+
+### 17.10 Guides
+
+- **In the app:** About has a "GUIDES" panel with four rows (title, one line, chevron). The no-result screen, the AI sheet and the end of the Home list link to "How to check a NAFDAC number".
+- **Static guide pages** (real pages, not app screens): eggplant top bar with the official horizontal lockup (inlined SVG) linking home, a "Guides" link and an "Open the app" pill; Nunito headings in eggplant on the ground colour; white rounded call-to-action card; related guides; the standard disclaimer at the bottom. They keep the neutral wording rules: "check what the registry shows", never "fake detector".
+
+### 17.11 Marketing and sharing assets (page "Social")
+
+Five posts and stories plus a 1200x630 link preview, all using the shopper cut-outs, brand tokens and the line "Check it before you buy it" or "3 steps before you buy.", each carrying `checkam.com.ng` and "Not affiliated with NAFDAC.". The link preview is exported to `frontend/public/og-3-steps.png` (1200x630, used by the Open Graph and Twitter tags) and the story to `frontend/public/share-3-steps-story.png`.
+
+### 17.12 Other additions
+
+Skeleton frames for Home, Search, Saved and Result; sticky `CheckBar` on the result screen (progress, Save this check, Share on WhatsApp); tick or cross checklist rows with a completion state; the badge meaning sheet; the haptics toggle in About (vibration, where the phone supports it).

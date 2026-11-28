@@ -16,6 +16,7 @@ import { Product, SafetyAlert } from '../types';
 import { repository } from '../data/repository';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useAiLookup } from '../hooks/useAiLookup';
+import { GUIDES, GUIDES_INDEX, HOW_TO_CHECK_GUIDE } from '../lib/guides';
 import { AiSearchButton } from '../components/ai';
 
 interface HomeScreenProps {
@@ -303,19 +304,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          {/* One product per row with its thumbnail, the same rows as the Saved tab */}
+          <div className="flex flex-col gap-3">
             {allProducts.length === 0 ? (
               <>
-                <ProductCardSkeleton layout="tile" />
-                <ProductCardSkeleton layout="tile" />
-                <ProductCardSkeleton layout="tile" />
-                <ProductCardSkeleton layout="tile" />
+                <ProductCardSkeleton layout="row" />
+                <ProductCardSkeleton layout="row" />
+                <ProductCardSkeleton layout="row" />
+                <ProductCardSkeleton layout="row" />
               </>
             ) : (
               allProducts.map((prod, idx) => (
                 <ProductCard
                   key={`all-${prod.id}-${idx}`}
-                  layout="tile"
+                  layout="row"
                   brand={prod.brand_name || prod.product_name}
                   maker={prod.manufacturer}
                   regNumber={prod.nafdac_reg_num}
@@ -362,6 +364,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </div>
             </div>
           )}
+
+          {/* Guides: plain links to the static guide pages */}
+          <nav aria-label="Guides" className="mt-4 flex flex-col items-center gap-1.5 pb-2 text-center">
+            <div className="lbl">GUIDES</div>
+            {[HOW_TO_CHECK_GUIDE, GUIDES[1], { title: 'All guides', href: GUIDES_INDEX }].map((g) => (
+              <a key={g.href} href={g.href} className="text-sm font-extrabold text-ink underline">
+                {g.title}
+              </a>
+            ))}
+          </nav>
         </div>
       </main>
 

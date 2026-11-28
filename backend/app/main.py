@@ -13,7 +13,17 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.db import close_pool, init_pool
-from app.routers import ai_lookup, alerts, checklists, health, meta, products, search, sync
+from app.routers import (
+    ai_lookup,
+    alerts,
+    checklists,
+    feedback,
+    health,
+    meta,
+    products,
+    search,
+    sync,
+)
 from app.settings import settings
 
 
@@ -94,6 +104,7 @@ api_v1.include_router(checklists.router)
 api_v1.include_router(sync.router)
 api_v1.include_router(meta.router)
 api_v1.include_router(ai_lookup.router)
+api_v1.include_router(feedback.router)
 
 app.mount("/api/v1", api_v1)
 
@@ -105,3 +116,4 @@ app.include_router(checklists.router)
 app.include_router(sync.router)
 app.include_router(meta.router)
 app.include_router(ai_lookup.router)
+app.include_router(feedback.router)

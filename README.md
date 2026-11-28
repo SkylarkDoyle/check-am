@@ -62,6 +62,13 @@ An optional extra for products that are not in the registry. The backend asks Go
 - **Treat it as a hint, not a verdict.** AI responses may include mistakes, and packaging differs by country. Every answer carries that disclaimer.
 - **Off by default:** it is on only when the server has a `SERPAPI_API_KEY`. `GET /meta` reports `ai_lookup_enabled`.
 
+### Feedback
+
+`POST /api/v1/feedback` takes a short report or idea (`kind`: `bug`, `wrong_data`, `idea`, `other`, `helpful_yes`, `helpful_no`) with an optional message, contact and screen context, and answers `201 {"ok": true}`.
+
+- **Privacy:** no accounts. It stores the text you send, an optional contact if you give one, and hashes of the anonymous `X-Device-Id` and of your IP (never the raw values). Contact details are never logged.
+- **Limits:** 8 per device per hour, 20 per device per day and 60 per IP per day (`429 FEEDBACK_RATE_LIMITED`). Errors use `{"error": {"code", "message"}}`.
+
 ### Status values
 
 Registry state is reported with neutral words:

@@ -24,3 +24,4 @@ export * from './Skeleton';
 export * from './BadgeInfoSheet';
 export * from './ChecklistRow';
 export * from './CheckBar';
+export * from './FeedbackSheet';

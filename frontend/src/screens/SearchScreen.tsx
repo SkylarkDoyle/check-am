@@ -16,6 +16,7 @@ import { repository, SearchResultItem } from '../data/repository';
 import { AiStrip, AiLookupSheet } from '../components/ai';
 import { AI_FIXTURES, useAiLookup } from '../hooks/useAiLookup';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { HOW_TO_CHECK_GUIDE } from '../lib/guides';
 
 interface SearchScreenProps {
   initialQuery?: string;
@@ -228,6 +229,9 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({
             {/* Scan the label button */}
             <div className="w-full pt-2">
               <Button label="Scan the label" width="full" onClick={onOpenScan} />
+              <a href={HOW_TO_CHECK_GUIDE.href} className="mt-3 block text-center text-sm font-extrabold text-ink underline">
+                {HOW_TO_CHECK_GUIDE.title}
+              </a>
             </div>
 
             {/* Legal Disclaimer */}

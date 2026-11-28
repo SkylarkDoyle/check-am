@@ -24,6 +24,7 @@ export default defineConfig({
         navigateFallbackDenylist: [
           /^\/api/,
           /^\/faq(\/|$)/,
+          /^\/guides(\/|$)/,
           /^\/how-to-check-nafdac-number(\/|$)/,
           /^\/check-a-product-before-you-buy(\/|$)/,
           /^\/robots\.txt$/,

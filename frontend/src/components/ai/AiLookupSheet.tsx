@@ -15,6 +15,8 @@ import {
   whatsappUrl,
 } from '../../lib/aiAnswer';
 import { isAiSaved, removeAiAnswer, saveAiAnswer } from '../../lib/aiSaved';
+import { sendHelpful } from '../../lib/feedback';
+import { HOW_TO_CHECK_GUIDE } from '../../lib/guides';
 
 export interface AiLookupSheetProps {
   isOpen: boolean;
@@ -115,6 +117,16 @@ export const AiLookupSheet: React.FC<AiLookupSheetProps> = ({
     };
   }, [isOpen, result, query]);
 
+  // One-tap "was this helpful?": sent quietly, and only once per answer.
+  const [helpful, setHelpful] = useState<boolean | null>(null);
+  useEffect(() => {
+    setHelpful(null);
+  }, [query, result]);
+  const handleHelpful = (yes: boolean) => {
+    setHelpful(yes);
+    void sendHelpful(yes, { screen: 'ai_answer', query });
+  };
+
   const handleSave = async () => {
     if (!result) return;
     if (saved) {
@@ -179,11 +191,27 @@ export const AiLookupSheet: React.FC<AiLookupSheetProps> = ({
           )}
           <div className="ai-note">{COUNTRY_NOTE}</div>
           <Disclaimer text={`${AI_DISCLAIMER} Not from NAFDAC.`} />
+          <div className="flex items-center justify-between gap-3 rounded-md border-thin border-line px-3 py-2">
+            <span className="text-sm font-bold">{helpful === null ? 'Was this helpful?' : 'Thanks for telling us'}</span>
+            {helpful === null && (
+              <span className="flex gap-2">
+                <button type="button" aria-label="Yes, helpful" onClick={() => handleHelpful(true)} className="flex h-10 w-10 items-center justify-center rounded-full border-thin border-ink">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 11v9H4v-9zM7 11l4-8a2 2 0 0 1 2 2v4h6a2 2 0 0 1 2 2l-1 6a2 2 0 0 1-2 2H7" /></svg>
+                </button>
+                <button type="button" aria-label="No, not helpful" onClick={() => handleHelpful(false)} className="flex h-10 w-10 items-center justify-center rounded-full border-thin border-ink">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: 'rotate(180deg)' }}><path d="M7 11v9H4v-9zM7 11l4-8a2 2 0 0 1 2 2v4h6a2 2 0 0 1 2 2l-1 6a2 2 0 0 1-2 2H7" /></svg>
+                </button>
+              </span>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <Button tone="secondary" label={saved ? 'Saved' : 'Save'} onClick={handleSave} />
             <Button tone="secondary" label="Share on WhatsApp" onClick={handleShare} />
           </div>
           <Button tone="primary" width="full" label="Done" onClick={onClose} />
+          <a href={HOW_TO_CHECK_GUIDE.href} className="text-center text-sm font-extrabold text-ink underline">
+            {HOW_TO_CHECK_GUIDE.title}
+          </a>
           {remaining !== undefined && (
             <div className="ai-cnt">{remaining} {remaining === 1 ? 'lookup' : 'lookups'} left today</div>
           )}

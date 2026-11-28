@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     # Bump when the prompt changes so old cached answers are not served for the new question.
     ai_prompt_version: int = 2
     ai_ip_salt: str = "checkam"
+    # Feedback endpoint: fair-use limits (stored submissions per rolling window).
+    feedback_limit_per_device_hour: int = 8
+    feedback_limit_per_device_day: int = 20
+    feedback_limit_per_ip_day: int = 60
     # Pool sizing: keep small on Neon free + FastAPI Cloud Nano (500 MiB).
     db_pool_min: int = 1
     db_pool_max: int = 5

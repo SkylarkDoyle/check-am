@@ -13,6 +13,17 @@ import {
 } from './types';
 import type { AiLookupResult, AiUsage } from '../components/ai/types';
 
+export type FeedbackKind = 'bug' | 'wrong_data' | 'idea' | 'other' | 'helpful_yes' | 'helpful_no';
+
+export interface FeedbackPayload {
+  kind: FeedbackKind;
+  message?: string | null;
+  contact?: string | null;
+  context?: { screen?: string | null; reg_number?: string | null; query?: string | null; app_version?: string | null } | null;
+  /** Honeypot: real people leave it empty. */
+  website?: string | null;
+}
+
 export class CheckAmApiError extends Error {
   code: string;
   status: number;
@@ -179,6 +190,20 @@ export const api = {
         signal,
       },
       45000
+    );
+  },
+
+  /** Send feedback. Stored on the server; no account, rate limited per device. */
+  async sendFeedback(payload: FeedbackPayload, deviceId: string, signal?: AbortSignal): Promise<{ ok: boolean }> {
+    return fetchWithTimeout<{ ok: boolean }>(
+      '/feedback',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Device-Id': deviceId },
+        body: JSON.stringify(payload),
+        signal,
+      },
+      15000
     );
   },
 };

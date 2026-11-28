@@ -69,7 +69,14 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
           <path d="M12 10v4.5M12 17.2v.1"></path>
         </svg>
       )}
-      <span>{getLabel()}</span>
+      {status === 'lapsed' && size === 'short' ? (
+        // On narrow screens the "/ not found" part is hidden (see .ca-badge-x) so the badge stays on one line.
+        <span>
+          Lapsed<span className="ca-badge-x"> / not found</span>
+        </span>
+      ) : (
+        <span>{getLabel()}</span>
+      )}
     </span>
   );
 };

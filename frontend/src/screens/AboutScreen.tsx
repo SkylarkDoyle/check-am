@@ -7,8 +7,10 @@ import {
   Button,
   Disclaimer,
   TabBar,
-  BottomSheet
+  BottomSheet,
+  FeedbackSheet
 } from '../components';
+import { GUIDES } from '../lib/guides';
 import { db } from '../db';
 import { repository } from '../data/repository';
 import { runSync, subscribeSyncStatus, SyncStatus } from '../data/sync';
@@ -32,6 +34,7 @@ export const AboutScreen: React.FC<AboutScreenProps> = ({
   const [lastSynced, setLastSynced] = useState<string>('');
   const [savedCount, setSavedCount] = useState(0);
   const [showIosSheet, setShowIosSheet] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [vibration, setVibration] = useState(isHapticsEnabled());
   const [aiOn, setAiOn] = useState(AI_FIXTURES);
   const { isStandalone, isIos, promptInstall } = usePwaInstall();
@@ -254,6 +257,44 @@ export const AboutScreen: React.FC<AboutScreenProps> = ({
           </div>
         </div>
 
+        {/* Guides: static pages that explain how to check a pack */}
+        <div className="flex flex-col gap-2">
+          <div className="lbl">GUIDES</div>
+          <div className="panel">
+            {GUIDES.map((g, i) => (
+              <a
+                key={g.href}
+                href={g.href}
+                className={`flex items-center gap-3 py-3 ${i < GUIDES.length - 1 ? 'border-b-thin border-line' : ''}`}
+              >
+                <span className="min-w-0 flex-1">
+                  <b className="block text-[15px] font-extrabold text-ink">{g.title}</b>
+                  <small className="block text-xs leading-snug text-ink-muted">{g.description}</small>
+                </span>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="flex-none text-ink-muted" aria-hidden="true">
+                  <path d="M9 5l7 7-7 7" />
+                </svg>
+              </a>
+            ))}
+          </div>
+        </div>
+
+        {/* Feedback */}
+        <div className="flex flex-col gap-2">
+          <div className="lbl">HELP US IMPROVE</div>
+          <div className="panel">
+            <button type="button" className="flex w-full items-center gap-3 py-3 text-left" onClick={() => setFeedbackOpen(true)}>
+              <span className="min-w-0 flex-1">
+                <b className="block text-[15px] font-extrabold text-ink">Send feedback</b>
+                <small className="block text-xs leading-snug text-ink-muted">Tell us what is broken or missing.</small>
+              </span>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="flex-none text-ink-muted" aria-hidden="true">
+                <path d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
         {/* Section 3: SOURCES AND LEGAL */}
         <div className="flex flex-col gap-2">
           <div className="lbl">SOURCES AND LEGAL</div>
@@ -268,6 +309,8 @@ export const AboutScreen: React.FC<AboutScreenProps> = ({
       </main>
 
       <div style={{ height: 'var(--spacing-5)' }}></div>
+
+      <FeedbackSheet isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} context={{ screen: 'about' }} />
 
       {/* iOS Safari Instructions Sheet */}
       {isIos && (

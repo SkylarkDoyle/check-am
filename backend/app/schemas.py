@@ -136,6 +136,22 @@ class AiLookupRequest(BaseModel):
     q: str = Field(min_length=1, max_length=200)
 
 
+class FeedbackContext(BaseModel):
+    # Lengths are checked by the router so the error uses the API's own {"error": ...} shape.
+    screen: str | None = None
+    reg_number: str | None = None
+    query: str | None = None
+    app_version: str | None = None
+
+
+class FeedbackRequest(BaseModel):
+    kind: Literal["bug", "wrong_data", "idea", "other", "helpful_yes", "helpful_no"]
+    message: str | None = None
+    contact: str | None = None
+    context: FeedbackContext | None = None
+    website: str | None = None  # honeypot: real users leave it empty
+
+
 class AiUsage(BaseModel):
     limit: int
     remaining: int
